@@ -47,20 +47,20 @@ namespace Plugins.GenericScpiPowerMeter
             {
                 var idnBytes = _protocol.Encode(_config.Commands.GetIdn, null);
                 Console.WriteLine($"[DEBUG] 发送 IDN 查询命令: {BitConverter.ToString(idnBytes)}");
-                var response = await _transport.SendReceiveAsync(idnBytes);
-                var idnString = _protocol.Decode(response);
-                Console.WriteLine($"{idnString}");
-                // 解析 IDN 响应: "Vendor,Model,SerialNumber,FirmwareVersion"
-                var parts = idnString.Split(',');
-                if (parts.Length >= 4)
-                {
-                    Info = new DeviceInfo(
-                        vendor: parts[0].Trim(),
-                        model: parts[1].Trim(),
-                        serialNumber: parts[2].Trim(),
-                        firmwareVersion: parts[3].Trim()
-                    );
-                }
+                //var response = await _transport.SendReceiveAsync(idnBytes);
+                //var idnString = _protocol.Decode(response);
+                //Console.WriteLine($"{idnString}");
+                //// 解析 IDN 响应: "Vendor,Model,SerialNumber,FirmwareVersion"
+                //var parts = idnString.Split(',');
+                //if (parts.Length >= 4)
+                //{
+                //    Info = new DeviceInfo(
+                //        vendor: parts[0].Trim(),
+                //        model: parts[1].Trim(),
+                //        serialNumber: parts[2].Trim(),
+                //        firmwareVersion: parts[3].Trim()
+                //    );
+                //}
             }
             catch
             {

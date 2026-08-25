@@ -78,6 +78,7 @@ namespace Free_spaceOpticalCirculatorTestApp.DataModel.ZeroCalibration
         public static void UpdateItem(string testBoxSn, ZeroCalibration item)
         {
             var config = Load();
+
             var boxEntry = GetOrCreateBoxEntry(config, testBoxSn);
 
             // 移除同TestItemId旧记录
@@ -87,7 +88,7 @@ namespace Free_spaceOpticalCirculatorTestApp.DataModel.ZeroCalibration
 
             boxEntry.Items.Add(item);
             boxEntry.LastUpdated = DateTime.Now;
-
+            config.LastUpdated = DateTime.Now;
             Save(config);
         }
 

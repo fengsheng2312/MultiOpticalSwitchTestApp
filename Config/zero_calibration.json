@@ -12,7 +12,7 @@
           "Channel": "CH1",
           "ZeroValueDbm": -1.235,
           "CalibratedAt": "2026-08-18T09:00:00",
-          "SWStatus": [ "1", "1", "2", "0", "0" ]
+          "SWStatus": [ "2", "6", "0","2" ]
         },
         {
           "TestItemId": 2,
@@ -20,7 +20,7 @@
           "Channel": "CH2",
           "ZeroValueDbm": -1.180,
           "CalibratedAt": "2026-08-18T09:01:00",
-          "SWStatus": [ "1", "1", "0", "2", "2" ]
+          "SWStatus": [ "2","6","8", "3" ]
         },
         {
           "TestItemId": 3,
@@ -28,7 +28,7 @@
           "Channel": "CH1",
           "ZeroValueDbm": -0.950,
           "CalibratedAt": "2026-08-18T09:02:00",
-          "SWStatus": [ "1", "1", "0", "0", "3" ]
+          "SWStatus": [ "2", "6", "0","1" ]
         },
         {
           "TestItemId": 4,
@@ -36,7 +36,7 @@
           "Channel": "CH2",
           "ZeroValueDbm": -1.310,
           "CalibratedAt": "2026-08-18T09:03:00",
-          "SWStatus": [ "2", "0", "1", "2", "2" ]
+          "SWStatus": [ "2", "5", "8", "3" ]
         },
         {
           "TestItemId": 5,
@@ -44,7 +44,7 @@
           "Channel": "CH2",
           "ZeroValueDbm": -1.270,
           "CalibratedAt": "2026-08-18T09:04:00",
-          "SWStatus": [ "2", "2", "1", "0", "1" ]
+          "SWStatus": [ "2", "5", "0", "1" ]
         },
         {
           "TestItemId": 6,
@@ -52,7 +52,7 @@
           "Channel": "CH1",
           "ZeroValueDbm": -1.020,
           "CalibratedAt": "2026-08-18T09:05:00",
-          "SWStatus": [ "2", "2", "1", "0", "4" ]
+          "SWStatus": [ "2", "5", "0", "2" ]
         },
         {
           "TestItemId": 7,
@@ -60,7 +60,7 @@
           "Channel": "CH1",
           "ZeroValueDbm": -1.290,
           "CalibratedAt": "2026-08-18T09:06:00",
-          "SWStatus": [ "3", "0", "2", "1", "0" ]
+          "SWStatus": [ "1", "4", "7", "2" ]
         }
       ]
     },

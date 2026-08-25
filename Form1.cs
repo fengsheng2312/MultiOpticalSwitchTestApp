@@ -26,12 +26,14 @@ namespace Free_spaceOpticalCirculatorTestApp
         private readonly Dictionary<UIComboBox, bool> _comboOpenStatus = new();
         private UIComboBox _currentOpenCombo = null;
         private readonly SwitchDevice _switchDevice;
+        private readonly SwitchDevice _switchDevice2;
         // 开关板原始接收缓存，用来拼接分片字节
 
         public Form1()
         {
             InitializeComponent();
             _switchDevice = new SwitchDevice();
+            _switchDevice2 = new SwitchDevice();
             BindCombo(uiComboBox1);
             BindCombo(uiComboBox3);
             this.Load += Form1_Load;
@@ -75,7 +77,7 @@ namespace Free_spaceOpticalCirculatorTestApp
             _ = RefreshAllSerialPortCombosAsync();
             LoadPlugins();
             var cbos = new UIComboBox[] { SwitchBaudrate, uiComboBox4 };
-
+            uiComboBox2.SelectedIndex = 0;
             foreach (var cbo in cbos)
             {
                 if (cbo.Items.Count > 0)
@@ -92,6 +94,11 @@ namespace Free_spaceOpticalCirculatorTestApp
             //====新增订阅完整帧事件====
             _switchDevice.OnDeviceFrameComplete += SwitchDevice_OnDeviceFrameComplete;
 
+            _switchDevice2.OnDataReceived += SwitchDevice_OnDataReceived;
+            _switchDevice2.OnDisconnected += SwitchDevice_OnDisconnected;
+            _switchDevice2.OnError += SwitchDevice_OnError;
+            _switchDevice2.OnDeviceFrameComplete += SwitchDevice2_OnDeviceFrameComplete;
+
             SerialGlobalManager.SerialLogEvent += OnSerialLog;
             if (SwitchBaudrate.Items.Count > 0)
             {
@@ -99,6 +106,20 @@ namespace Free_spaceOpticalCirculatorTestApp
             }
         }
         private void SwitchDevice_OnDeviceFrameComplete(byte[] frameBytes)
+        {
+            try
+            {
+                string gbkText = Encoding.GetEncoding("GBK").GetString(frameBytes);
+                Console.WriteLine($"【开关板GBK完整应答】{gbkText}");
+                AppendGbkLog(gbkText);
+            }
+            catch
+            {
+                //二进制数据GBK解码乱码直接忽略
+                Console.WriteLine($"帧GBK解码失败，原始字节：{BitConverter.ToString(frameBytes)}");
+            }
+        }
+        private void SwitchDevice2_OnDeviceFrameComplete(byte[] frameBytes)
         {
             try
             {
@@ -352,11 +373,10 @@ namespace Free_spaceOpticalCirculatorTestApp
             }
         }
 
-        private void uiButton3_Click(object sender, EventArgs e)
+        private async void uiButton3_Click(object sender, EventArgs e)
         {
             // 1. 获取所有勾选的 CheckBox
             var checkedBoxes = GetCheckedBoxes(uiGroupBox3); // 假设你的容器叫 uiPanel1
-
             // 2. 校验是否至少选择了一项
             if (checkedBoxes.Count == 0)
             {
@@ -385,26 +405,57 @@ namespace Free_spaceOpticalCirculatorTestApp
                 Console.WriteLine($"正在测试: {itemName}&&{item.TestItemId} ");
                 // 执行对应的测试方法...
                 //1.根据测试名 寻找对应开关状态，并执行开关操作
-                List<String> switchStatus = item?.SWStatus ?? new List<string>();
+                List<String> switchList = item.SWStatus;
+                //便利开关操作
+                for (int i = 0; i < switchList.Count; i++)
+                {
+                    if (switchList[i].Equals("0"))
+                    {
+                        continue;
+                    }
+                    if (i < 3)
+                    {
+                        //操作开关板1
+                        await _switchDevice.SwitchLightChannel(int.TryParse(switchList[i], out int channel) ? channel : 0);
 
-                //**待补充//
+                    }
+                    else
+                    {
+                        //操作开关板2
+                        await _switchDevice2.SwitchLightChannel(int.TryParse(switchList[i], out int channel) ? channel : 0);
+                    }
+                }
+                //1.4 读取功率计读数，得到归零值，更新日期和归零值大小到本地json文件，更新状态UI
+                //功率计通道暂时无法选择，手动修改配置表的命令可以选择读取的通道
+                double power = 0.0;
+                var device = _currentDevice;
+                if (device == null || !device.IsConnected)
+                {
+                    MessageBox.Show("请先连接功率计", "提示");
+                    return;
+                }
+                try
+                {
+                    var power2 = await device.ReadPowerAsync();
+                    power = double.Parse(power2.ToString("F4"));
+                    if (ReferenceEquals(_currentDevice, device))
+                    {
+                        MessageBox.Show($"功率读取成功: {power2:F4} dBm", "信息");
+                    }
 
+                }
+                catch (OperationCanceledException) when (!ReferenceEquals(_currentDevice, device))
+                {
+                    // Disconnect canceled the pending read.
+                }
+                catch (Exception ex)
+                {
+                    if (ReferenceEquals(_currentDevice, device))
+                        MessageBox.Show($"功率读取失败: {ex.Message}", "错误");
+                }
 
                 //2.采集光功率，并计算测试结果
                 double zeroValue = item?.ZeroValueDbm ?? 0.0;
-                double power = 0.0;
-                //Global.opticalPowermeter.ReadPowerAsync().ContinueWith(t =>
-                //{
-                //    if (t.IsCompletedSuccessfully)
-                //    {
-                //        power = t.Result;
-                //        MessageBox.Show($"功率读取成功: {power:F4} dBm", "信息");
-                //    }
-                //    else
-                //    {
-                //        MessageBox.Show($"功率读取失败: {t.Exception?.GetBaseException().Message}", "错误");
-                //    }
-                //}, TaskScheduler.FromCurrentSynchronizationContext());
 
                 //2.1 IL需要计算其他不用，需要做判断； 2.1.1 IL计算的时候还需要判断器件类型，确定需不需要再减去一个归零值
                 //IL = power - zeroValue - collimatorLoss
@@ -466,6 +517,9 @@ namespace Free_spaceOpticalCirculatorTestApp
         }
         private async void uiButton1_Click_1(object sender, EventArgs e)
         {
+            ITransport? transport = null;
+            IPowerMeter? device = null;
+
             try
             {
                 //_lblStatus.Text = "正在连接...";
@@ -521,7 +575,8 @@ namespace Free_spaceOpticalCirculatorTestApp
                     return;
                 }
                 Console.WriteLine("有找到插件");
-                var transport = CreateTransport();
+                connectButton.Enabled = false;
+                transport = CreateTransport();
                 Console.WriteLine($"[DEBUG] 创建传输协议成功: {transport.GetType().Name}");
                 // ★ 调用插件给的工厂，MainForm 不 new 任何协议
                 var protocol = CreateProtocol();
@@ -529,32 +584,45 @@ namespace Free_spaceOpticalCirculatorTestApp
                 //_currentDevice = plugin.Create(transport, protocol, new Dictionary<string, string>());
                 await transport.OpenAsync(Omtransportparams.Text);
 
-                _currentDevice = plugin.Create(transport, protocol, new Dictionary<string, string>
+                device = plugin.Create(transport, protocol, new Dictionary<string, string>
                 {
                     ["model"] = model
                 });
-                Global.opticalPowermeter = _currentDevice;
-                Console.WriteLine($"[DEBUG] 创建设备实例: {_currentDevice.GetType().FullName}+{protocol.GetType().Name}");
-                Console.WriteLine($"[DEBUG] 打开成功: {_currentDevice.GetType().FullName}+{protocol.GetType().Name}");
-                await _currentDevice.ConnectAsync(Omtransportparams.Text);
-                //await _currentDevice.ReadPowerAsync();
-                await _currentDevice.ReadPowerAsync().ContinueWith(t =>
-                {
-                    if (t.IsCompletedSuccessfully)
-                    {
-                        var power = t.Result;
-                        MessageBox.Show($"功率读取成功: {power:F4} dBm", "信息");
-                    }
-                    else
-                    {
-                        MessageBox.Show($"功率读取失败: {t.Exception?.GetBaseException().Message}", "错误");
-                    }
-                }, TaskScheduler.FromCurrentSynchronizationContext());
+                _currentDevice = device;
+                Global.opticalPowermeter = device;
+                Console.WriteLine($"[DEBUG] 创建设备实例: {device.GetType().FullName}+{protocol.GetType().Name}");
+                Console.WriteLine($"[DEBUG] 打开成功: {device.GetType().FullName}+{protocol.GetType().Name}");
+                await device.ConnectAsync(Omtransportparams.Text);
+                // Keep the existing behavior: perform the first power read after connecting.
+                // SerialTransport now cancels this read when the user disconnects.
+                await device.ReadPowerAsync();
             }
             catch (Exception ex)
             {
-                //_lblStatus.Text = "连接失败";
-                MessageBox.Show($"连接失败: {ex.Message}", "错误", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                // A disconnect cancels an in-flight read. It is an expected transition,
+                // so do not show a misleading "connect failed" dialog in that case.
+                if (device != null && ReferenceEquals(_currentDevice, device))
+                {
+                    _currentDevice = null;
+                    Global.opticalPowermeter = null;
+                    try
+                    {
+                        await device.DisconnectAsync();
+                    }
+                    catch (Exception cleanupEx)
+                    {
+                        Console.WriteLine($"[DEBUG] 连接失败后的清理异常: {cleanupEx.Message}");
+                    }
+                    device.Dispose();
+                    connectButton.Enabled = true;
+                    MessageBox.Show($"连接失败: {ex.Message}", "错误", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
+                else if (device == null)
+                {
+                    transport?.Dispose();
+                    connectButton.Enabled = true;
+                    MessageBox.Show($"连接失败: {ex.Message}", "错误", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
             }
 
         }
@@ -711,15 +779,29 @@ namespace Free_spaceOpticalCirculatorTestApp
 
         private async void uiButton7_Click(object sender, EventArgs e)
         {
+            // Remove the shared reference before awaiting I/O cancellation. This makes
+            // a concurrent connect/read unable to publish the old device again.
+            var device = _currentDevice;
+            if (device == null)
+                return;
+
+            if (!ReferenceEquals(
+                    Interlocked.CompareExchange(ref _currentDevice, null, device),
+                    device))
+            {
+                return;
+            }
+
             try
             {
-                if (_currentDevice != null)
-                {
-                    await _currentDevice.DisconnectAsync();
-                    _currentDevice.Dispose();
-                    _currentDevice = null;
-                    MessageBox.Show("设备已断开连接", "信息");
-                }
+                Console.WriteLine($"[DEBUG] 正在断开连接: {device.GetType().FullName}");
+                await device.DisconnectAsync();
+                Console.WriteLine($"[DEBUG] 设备已断开连接: {device.GetType().FullName}");
+                device.Dispose();
+                Console.WriteLine($"[DEBUG] 设备资源已释放: {device.GetType().FullName}");
+                Global.opticalPowermeter = null;
+                MessageBox.Show("设备已断开连接", "信息");
+                connectButton.Enabled = true;
 
                 //_btnConnect.Enabled = true;
                 //_btnDisconnect.Enabled = false;
@@ -732,11 +814,14 @@ namespace Free_spaceOpticalCirculatorTestApp
             }
             catch (Exception ex)
             {
+                device.Dispose();
+                Global.opticalPowermeter = null;
+                connectButton.Enabled = true;
                 MessageBox.Show($"断开失败: {ex.Message}", "错误");
             }
         }
 
-        private void TestZero_Click(object sender, EventArgs e)
+        private async void TestZero_Click(object sender, EventArgs e)
         {
             //1.通过检测测试项、切换不同的开关状态
             //1.1判断选择项
@@ -746,16 +831,15 @@ namespace Free_spaceOpticalCirculatorTestApp
             {
                 Console.WriteLine($"Text: {selected.Text}");
             }
-
             // 获取某台盒子全部归零项
             // 如果有对应测试盒则获取归零项
             //{
-            //      "TestItemId": 1,
-            //      "TestItemName": "Tx-Com(IL)",
-            //      "Channel": "CH1",
-            //      "ZeroValueDbm": -1.235,
-            //      "CalibratedAt": "2026-08-18T09:00:00",
-            //      "SWStatus": ["1", "1", "2", "0", "0"]
+                //  "TestItemId": 1,
+                //"TestItemName": "Tx-Com(IL)",
+                //"Channel": "CH1",
+                //"ZeroValueDbm": -1.235,
+                //"CalibratedAt": "2026-08-18T09:00:00",
+                //"SWStatus": ["2", "6", "2"]
             //} 
             var TestBoxSn = uiTextBox4.Text.Trim();
             Console.WriteLine($"Test Box SN: {TestBoxSn}");
@@ -774,36 +858,88 @@ namespace Free_spaceOpticalCirculatorTestApp
             //获取一下TestItemId，方便后续写入json文件
             String Powerchannel = item.Channel;
             Console.WriteLine($"TestId: {item.TestItemId}, TestName: {item.TestItemName} Switch Status for {selected.Text}: {string.Join(", ", switchStatus)}");
-            //1.4 读取功率计读数，得到归零值，更新日期和归零值大小到本地json文件，更新状态UI
-            //功率计通道暂时无法选择，手动修改配置表的命令可以选择读取的通道
-            Global.opticalPowermeter.ReadPowerAsync().ContinueWith(t =>
+            List<String> switchList = item.SWStatus;
+            //便利开关操作
+            for(int i =0;i < switchList.Count;i++)
             {
-                if (t.IsCompletedSuccessfully)
+                if (switchList[i].Equals("0"))
                 {
-                    var power = t.Result;
-                    MessageBox.Show($"功率读取成功: {power:F4} dBm", "信息");
-                    // 更新归零值到本地json文件
-                    ZeroCalibration itemToUpdate = new ZeroCalibration
-                    {
-                        TestItemId = item.TestItemId,
-                        TestItemName = selected.Text,
-                        Channel = Powerchannel,
-                        ZeroValueDbm = power,
-                        CalibratedAt = DateTime.Now,
-                        SWStatus = switchStatus
-                    };
-                    ZeroConfigManager.UpdateItem(TestBoxSn, itemToUpdate);
+                    continue;
+                }
+                if (i < 3)
+                {
+                    //操作开关板1
+                    await _switchDevice.SwitchLightChannel(int.TryParse(switchList[i], out int channel) ? channel : 0);
+
                 }
                 else
                 {
-                    MessageBox.Show($"功率读取失败: {t.Exception?.GetBaseException().Message}", "错误");
+                    //操作开关板2
+                    await _switchDevice2.SwitchLightChannel(int.TryParse(switchList[i], out int channel) ? channel : 0);
                 }
-            }, TaskScheduler.FromCurrentSynchronizationContext());
+            }
+            //1.4 读取功率计读数，得到归零值，更新日期和归零值大小到本地json文件，更新状态UI
+            //功率计通道暂时无法选择，手动修改配置表的命令可以选择读取的通道
+            var device = _currentDevice;
+            if (device == null || !device.IsConnected)
+            {
+                MessageBox.Show("请先连接功率计", "提示");
+                return;
+            }
+            try
+            {
+                var power = await device.ReadPowerAsync();
+                if (ReferenceEquals(_currentDevice, device))
+                {
+                    item.ZeroValueDbm = power;
+                    MessageBox.Show($"功率读取成功: {power:F4} dBm", "信息");
+                }
+                    
+            }
+            catch (OperationCanceledException) when (!ReferenceEquals(_currentDevice, device))
+            {
+                // Disconnect canceled the pending read.
+            }
+            catch (Exception ex)
+            {
+                if (ReferenceEquals(_currentDevice, device))
+                    MessageBox.Show($"功率读取失败: {ex.Message}", "错误");
+            }
+            // ========== 新增：更新归零数据 ==========
+            item.CalibratedAt = DateTime.Now;
+
+            // 更新外层盒子的LastUpdated
+            entry.LastUpdated = DateTime.Now;
+            ZeroConfigManager.UpdateItem(TestBoxSn, item);
         }
 
-        private void uiButton5_Click(object sender, EventArgs e)
+        private async void uiButton5_Click(object sender, EventArgs e)
         {
-
+            var device = _currentDevice;
+            if (device == null || !device.IsConnected)
+            {
+                MessageBox.Show("请先连接功率计", "提示");
+                return;
+            }
+            try
+            {
+                var power = await device.ReadPowerAsync();
+                if (ReferenceEquals(_currentDevice, device))
+                    MessageBox.Show($"功率读取成功: {power:F4} dBm", "信息");
+            }
+            catch (OperationCanceledException) when (!ReferenceEquals(_currentDevice, device))
+            {
+                // Disconnect canceled the pending read.
+            }
+            catch (Exception ex)
+            {
+                if (ReferenceEquals(_currentDevice, device))
+                    MessageBox.Show($"功率读取失败: {ex.Message}", "错误");
+            }
+            finally
+            {
+                uiButton5.Enabled = true;
+            }
         }
 
         private void uiButton1_Click_2(object sender, EventArgs e)
@@ -968,7 +1104,7 @@ namespace Free_spaceOpticalCirculatorTestApp
         private async void uiButton9_Click(object sender, EventArgs e)
         {
             try
-            {   
+            {
                 String ch = switchCh.Text.Trim();
                 int.TryParse(ch, out int value);
                 //示例切通道3
@@ -979,6 +1115,75 @@ namespace Free_spaceOpticalCirculatorTestApp
                 MessageBox.Show($"切换通道失败：{ex.Message}");
             }
         }
-        // 使用
+
+        private void uiButton4_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                var selectItem = uiComboBox3.SelectedItem as ComPortItem;
+                if (selectItem == null)
+                {
+                    MessageBox.Show("请先选择串口！");
+                    return;
+                }
+
+                // 👉 判断：当前是要【打开】才赋值串口、波特率；关闭时不修改配置
+                if (uiButton4.Text == "打开")
+                {
+                    string comName = selectItem.ComPort.Trim();
+                    int baudrate;
+                    if (!int.TryParse(SwitchBaudrate.Text, out baudrate))
+                    {
+                        baudrate = 115200;
+                    }
+
+                    // 仅打开前设置参数
+                    _switchDevice2.ComPort = comName;
+                    _switchDevice2.BaudRate = baudrate;
+
+                    _switchDevice2.Open();
+                    bool ok = SerialGlobalManager.IsPortOnline(_switchDevice2.ComPort);
+                    Console.WriteLine($"打开后端口状态:{ok}");
+                    uiButton4.Text = "关闭";
+                    uiLight2.OnColor = Color.Green;
+                }
+                else
+                {
+                    // 关闭：直接Close，不再修改ComPort/BaudRate
+                    _switchDevice2.Close();
+                    uiButton4.Text = "打开";
+                    uiLight2.OnColor = Color.Red;
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"设备操作失败：{ex.Message}");
+            }
+        }
+
+        private void uiLabel18_Click(object sender, EventArgs e)
+        {
+
+        }
+
+        private async void uiButton9_Click_1(object sender, EventArgs e)
+        {
+            try
+            {
+                String ch = switchCh2.Text.Trim();
+                int.TryParse(ch, out int value);
+                //示例切通道3
+                await _switchDevice2.SwitchLightChannel(value);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"切换通道失败：{ex.Message}");
+            }
+        }
+
+        private void rtb_Log_TextChanged(object sender, EventArgs e)
+        {
+
+        }
     }
 }

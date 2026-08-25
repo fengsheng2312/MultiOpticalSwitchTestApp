@@ -35,6 +35,15 @@ namespace Free_spaceOpticalCirculatorTestApp
             uiPanel3 = new UIPanel();
             uiFlowLayoutPanel3 = new UIFlowLayoutPanel();
             uiCheckBoxGroup1 = new UICheckBoxGroup();
+            uiComboBox2 = new UIComboBox();
+            uiLabel24 = new UILabel();
+            uiLabel22 = new UILabel();
+            uiButton9 = new UIButton();
+            switchCh2 = new UITextBox();
+            uiLabel23 = new UILabel();
+            uiLabel21 = new UILabel();
+            uiLabel20 = new UILabel();
+            uiTextBox1 = new UITextBox();
             switchBtn = new UIButton();
             switchCh = new UITextBox();
             uiLabel18 = new UILabel();
@@ -95,6 +104,7 @@ namespace Free_spaceOpticalCirculatorTestApp
             uiRadioButton13 = new UIRadioButton();
             uiRadioButton14 = new UIRadioButton();
             uiGroupBox2 = new UIGroupBox();
+            uiLabel19 = new UILabel();
             rtb_Log = new UIRichTextBox();
             uiButton8 = new UIButton();
             uiTextBox7 = new UITextBox();
@@ -112,7 +122,6 @@ namespace Free_spaceOpticalCirculatorTestApp
             uiLight1 = new UILight();
             SwitchBaudrate = new UIComboBox();
             uiButton2 = new UIButton();
-            uiLabel19 = new UILabel();
             uiGroupBox1.SuspendLayout();
             uiPanel3.SuspendLayout();
             uiFlowLayoutPanel3.SuspendLayout();
@@ -174,6 +183,15 @@ namespace Free_spaceOpticalCirculatorTestApp
             // 
             // uiCheckBoxGroup1
             // 
+            uiCheckBoxGroup1.Controls.Add(uiComboBox2);
+            uiCheckBoxGroup1.Controls.Add(uiLabel24);
+            uiCheckBoxGroup1.Controls.Add(uiLabel22);
+            uiCheckBoxGroup1.Controls.Add(uiButton9);
+            uiCheckBoxGroup1.Controls.Add(switchCh2);
+            uiCheckBoxGroup1.Controls.Add(uiLabel23);
+            uiCheckBoxGroup1.Controls.Add(uiLabel21);
+            uiCheckBoxGroup1.Controls.Add(uiLabel20);
+            uiCheckBoxGroup1.Controls.Add(uiTextBox1);
             uiCheckBoxGroup1.Controls.Add(switchBtn);
             uiCheckBoxGroup1.Controls.Add(switchCh);
             uiCheckBoxGroup1.Controls.Add(uiLabel18);
@@ -204,13 +222,123 @@ namespace Free_spaceOpticalCirculatorTestApp
             uiCheckBoxGroup1.TextAlignment = ContentAlignment.MiddleLeft;
             uiCheckBoxGroup1.ValueChanged += uiCheckBoxGroup1_ValueChanged;
             // 
+            // uiComboBox2
+            // 
+            uiComboBox2.DataSource = null;
+            uiComboBox2.FillColor = Color.White;
+            uiComboBox2.Font = new Font("宋体", 12F, FontStyle.Regular, GraphicsUnit.Point, 134);
+            uiComboBox2.ItemHoverColor = Color.FromArgb(155, 200, 255);
+            uiComboBox2.Items.AddRange(new object[] { "1", "2", "3", "4" });
+            uiComboBox2.ItemSelectForeColor = Color.FromArgb(235, 243, 255);
+            uiComboBox2.Location = new Point(98, 353);
+            uiComboBox2.Margin = new Padding(4, 5, 4, 5);
+            uiComboBox2.MinimumSize = new Size(63, 0);
+            uiComboBox2.Name = "uiComboBox2";
+            uiComboBox2.Padding = new Padding(0, 0, 30, 2);
+            uiComboBox2.Size = new Size(132, 29);
+            uiComboBox2.SymbolSize = 24;
+            uiComboBox2.TabIndex = 50;
+            uiComboBox2.TextAlignment = ContentAlignment.MiddleLeft;
+            uiComboBox2.Watermark = "";
+            // 
+            // uiLabel24
+            // 
+            uiLabel24.Font = new Font("宋体", 12F, FontStyle.Regular, GraphicsUnit.Point, 134);
+            uiLabel24.ForeColor = Color.FromArgb(48, 48, 48);
+            uiLabel24.Location = new Point(7, 359);
+            uiLabel24.Name = "uiLabel24";
+            uiLabel24.Size = new Size(88, 23);
+            uiLabel24.TabIndex = 49;
+            uiLabel24.Text = "读取通道(dbm)：";
+            // 
+            // uiLabel22
+            // 
+            uiLabel22.Font = new Font("宋体", 12F, FontStyle.Regular, GraphicsUnit.Point, 134);
+            uiLabel22.ForeColor = Color.FromArgb(48, 48, 48);
+            uiLabel22.Location = new Point(24, 541);
+            uiLabel22.Name = "uiLabel22";
+            uiLabel22.Size = new Size(100, 23);
+            uiLabel22.TabIndex = 47;
+            uiLabel22.Text = "板2";
+            // 
+            // uiButton9
+            // 
+            uiButton9.Font = new Font("宋体", 12F, FontStyle.Regular, GraphicsUnit.Point, 134);
+            uiButton9.Location = new Point(182, 564);
+            uiButton9.MinimumSize = new Size(1, 1);
+            uiButton9.Name = "uiButton9";
+            uiButton9.Size = new Size(79, 35);
+            uiButton9.TabIndex = 46;
+            uiButton9.Text = "切换";
+            uiButton9.TipsFont = new Font("宋体", 9F, FontStyle.Regular, GraphicsUnit.Point, 134);
+            uiButton9.Click += uiButton9_Click_1;
+            // 
+            // switchCh2
+            // 
+            switchCh2.Font = new Font("宋体", 12F, FontStyle.Regular, GraphicsUnit.Point, 134);
+            switchCh2.Location = new Point(66, 565);
+            switchCh2.Margin = new Padding(4, 5, 4, 5);
+            switchCh2.MinimumSize = new Size(1, 16);
+            switchCh2.Name = "switchCh2";
+            switchCh2.Padding = new Padding(5);
+            switchCh2.ShowText = false;
+            switchCh2.Size = new Size(108, 29);
+            switchCh2.TabIndex = 45;
+            switchCh2.TextAlignment = ContentAlignment.MiddleLeft;
+            switchCh2.Watermark = "";
+            // 
+            // uiLabel23
+            // 
+            uiLabel23.Font = new Font("宋体", 14F);
+            uiLabel23.ForeColor = Color.FromArgb(48, 48, 48);
+            uiLabel23.Location = new Point(24, 564);
+            uiLabel23.Name = "uiLabel23";
+            uiLabel23.Size = new Size(164, 29);
+            uiLabel23.TabIndex = 44;
+            uiLabel23.Text = "CH:";
+            uiLabel23.TextAlign = ContentAlignment.MiddleLeft;
+            // 
+            // uiLabel21
+            // 
+            uiLabel21.Font = new Font("宋体", 12F, FontStyle.Regular, GraphicsUnit.Point, 134);
+            uiLabel21.ForeColor = Color.FromArgb(48, 48, 48);
+            uiLabel21.Location = new Point(24, 469);
+            uiLabel21.Name = "uiLabel21";
+            uiLabel21.Size = new Size(100, 23);
+            uiLabel21.TabIndex = 43;
+            uiLabel21.Text = "板1";
+            // 
+            // uiLabel20
+            // 
+            uiLabel20.Font = new Font("宋体", 12F, FontStyle.Regular, GraphicsUnit.Point, 134);
+            uiLabel20.ForeColor = Color.FromArgb(48, 48, 48);
+            uiLabel20.Location = new Point(11, 443);
+            uiLabel20.Name = "uiLabel20";
+            uiLabel20.Size = new Size(88, 23);
+            uiLabel20.TabIndex = 42;
+            uiLabel20.Text = "读数(dbm)：";
+            // 
+            // uiTextBox1
+            // 
+            uiTextBox1.Font = new Font("宋体", 12F, FontStyle.Regular, GraphicsUnit.Point, 134);
+            uiTextBox1.Location = new Point(110, 437);
+            uiTextBox1.Margin = new Padding(4, 5, 4, 5);
+            uiTextBox1.MinimumSize = new Size(1, 16);
+            uiTextBox1.Name = "uiTextBox1";
+            uiTextBox1.Padding = new Padding(5);
+            uiTextBox1.ShowText = false;
+            uiTextBox1.Size = new Size(158, 29);
+            uiTextBox1.TabIndex = 41;
+            uiTextBox1.TextAlignment = ContentAlignment.MiddleLeft;
+            uiTextBox1.Watermark = "";
+            // 
             // switchBtn
             // 
             switchBtn.Font = new Font("宋体", 12F, FontStyle.Regular, GraphicsUnit.Point, 134);
-            switchBtn.Location = new Point(3, 531);
+            switchBtn.Location = new Point(182, 492);
             switchBtn.MinimumSize = new Size(1, 1);
             switchBtn.Name = "switchBtn";
-            switchBtn.Size = new Size(85, 35);
+            switchBtn.Size = new Size(79, 35);
             switchBtn.TabIndex = 40;
             switchBtn.Text = "切换";
             switchBtn.TipsFont = new Font("宋体", 9F, FontStyle.Regular, GraphicsUnit.Point, 134);
@@ -219,7 +347,7 @@ namespace Free_spaceOpticalCirculatorTestApp
             // switchCh
             // 
             switchCh.Font = new Font("宋体", 12F, FontStyle.Regular, GraphicsUnit.Point, 134);
-            switchCh.Location = new Point(88, 493);
+            switchCh.Location = new Point(66, 493);
             switchCh.Margin = new Padding(4, 5, 4, 5);
             switchCh.MinimumSize = new Size(1, 16);
             switchCh.Name = "switchCh";
@@ -234,12 +362,13 @@ namespace Free_spaceOpticalCirculatorTestApp
             // 
             uiLabel18.Font = new Font("宋体", 14F);
             uiLabel18.ForeColor = Color.FromArgb(48, 48, 48);
-            uiLabel18.Location = new Point(-1, 493);
+            uiLabel18.Location = new Point(24, 492);
             uiLabel18.Name = "uiLabel18";
-            uiLabel18.Size = new Size(77, 29);
+            uiLabel18.Size = new Size(164, 29);
             uiLabel18.TabIndex = 38;
-            uiLabel18.Text = "通道";
-            uiLabel18.TextAlign = ContentAlignment.MiddleCenter;
+            uiLabel18.Text = "CH:";
+            uiLabel18.TextAlign = ContentAlignment.MiddleLeft;
+            uiLabel18.Click += uiLabel18_Click;
             // 
             // uiSymbolLabel5
             // 
@@ -282,7 +411,7 @@ namespace Free_spaceOpticalCirculatorTestApp
             // uiButton5
             // 
             uiButton5.Font = new Font("宋体", 12F, FontStyle.Regular, GraphicsUnit.Point, 134);
-            uiButton5.Location = new Point(13, 355);
+            uiButton5.Location = new Point(11, 394);
             uiButton5.MinimumSize = new Size(1, 1);
             uiButton5.Name = "uiButton5";
             uiButton5.Size = new Size(83, 35);
@@ -1001,6 +1130,16 @@ namespace Free_spaceOpticalCirculatorTestApp
             uiGroupBox2.TextAlignment = ContentAlignment.MiddleLeft;
             uiGroupBox2.Click += uiGroupBox2_Click;
             // 
+            // uiLabel19
+            // 
+            uiLabel19.Font = new Font("宋体", 12F, FontStyle.Regular, GraphicsUnit.Point, 134);
+            uiLabel19.ForeColor = Color.FromArgb(48, 48, 48);
+            uiLabel19.Location = new Point(19, 788);
+            uiLabel19.Name = "uiLabel19";
+            uiLabel19.Size = new Size(181, 23);
+            uiLabel19.TabIndex = 41;
+            uiLabel19.Text = "例：开CH1:5A A5 01 01";
+            // 
             // rtb_Log
             // 
             rtb_Log.FillColor = Color.White;
@@ -1019,6 +1158,7 @@ namespace Free_spaceOpticalCirculatorTestApp
             rtb_Log.TabIndex = 40;
             rtb_Log.TextAlignment = ContentAlignment.MiddleCenter;
             rtb_Log.WordWrap = false;
+            rtb_Log.TextChanged += rtb_Log_TextChanged;
             // 
             // uiButton8
             // 
@@ -1054,7 +1194,7 @@ namespace Free_spaceOpticalCirculatorTestApp
             uiLabel10.Name = "uiLabel10";
             uiLabel10.Size = new Size(284, 23);
             uiLabel10.TabIndex = 37;
-            uiLabel10.Text = "功率计串口(保留，右侧可支持多协议)";
+            uiLabel10.Text = "驱动板2串口";
             // 
             // uiLabel5
             // 
@@ -1064,7 +1204,7 @@ namespace Free_spaceOpticalCirculatorTestApp
             uiLabel5.Name = "uiLabel5";
             uiLabel5.Size = new Size(100, 23);
             uiLabel5.TabIndex = 36;
-            uiLabel5.Text = "驱动板串口";
+            uiLabel5.Text = "驱动板1串口";
             // 
             // uiLabel1
             // 
@@ -1159,6 +1299,7 @@ namespace Free_spaceOpticalCirculatorTestApp
             uiButton4.TabIndex = 24;
             uiButton4.Text = "打开";
             uiButton4.TipsFont = new Font("宋体", 9F, FontStyle.Regular, GraphicsUnit.Point, 134);
+            uiButton4.Click += uiButton4_Click;
             // 
             // uiComboBox1
             // 
@@ -1232,16 +1373,6 @@ namespace Free_spaceOpticalCirculatorTestApp
             uiButton2.Text = "打开";
             uiButton2.TipsFont = new Font("宋体", 9F, FontStyle.Regular, GraphicsUnit.Point, 134);
             uiButton2.Click += uiButton2_Click_1;
-            // 
-            // uiLabel19
-            // 
-            uiLabel19.Font = new Font("宋体", 12F, FontStyle.Regular, GraphicsUnit.Point, 134);
-            uiLabel19.ForeColor = Color.FromArgb(48, 48, 48);
-            uiLabel19.Location = new Point(19, 788);
-            uiLabel19.Name = "uiLabel19";
-            uiLabel19.Size = new Size(181, 23);
-            uiLabel19.TabIndex = 41;
-            uiLabel19.Text = "例：开CH1:5A A5 01 01";
             // 
             // Form1
             // 
@@ -1355,5 +1486,14 @@ namespace Free_spaceOpticalCirculatorTestApp
         private UILabel uiLabel18;
         private UIRichTextBox rtb_Log;
         private UILabel uiLabel19;
+        private UILabel uiLabel20;
+        private UITextBox uiTextBox1;
+        private UILabel uiLabel21;
+        private UILabel uiLabel22;
+        private UIButton uiButton9;
+        private UITextBox switchCh2;
+        private UILabel uiLabel23;
+        private UIComboBox uiComboBox2;
+        private UILabel uiLabel24;
     }
 }

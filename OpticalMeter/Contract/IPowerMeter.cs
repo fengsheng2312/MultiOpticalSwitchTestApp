@@ -17,7 +17,7 @@ namespace OpticalMeter.Contract
         /// <summary>连接设备</summary>
         Task ConnectAsync(string connectionString);
 
-        /// <summary>断开设备</summary>
+        /// <summary>断开设备</summary>f
         Task DisconnectAsync();
 
         /// <summary>读取光功率（单位 dBm）</summary>
