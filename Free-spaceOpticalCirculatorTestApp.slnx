@@ -1,3 +1,4 @@
 <Solution>
+  <Project Path="../Plugins.JW8102Private/Plugins.JW8102Private.csproj" />
   <Project Path="Free-spaceOpticalCirculatorTestApp.csproj" />
 </Solution>

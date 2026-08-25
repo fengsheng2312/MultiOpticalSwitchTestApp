@@ -1,0 +1,31 @@
+{
+  "Model": "Opm7330C",
+  "Vendor": "commpolar（严浩）",
+  "Protocol": "SCPI",
+  "DefaultTransport": "Serial",
+  "SerialSettings": {
+    "BaudRate": 115200,
+    "DataBits": 8,
+    "StopBits": "One",
+    "Parity": "None",
+    "Handshake": "None"
+  },
+  "Commands": {
+    "ReadPower": "READ2:SCALar:POWer:DC?",
+    "SetWavelength": "SENS:POW:WAV {1310} nm",
+    "GetWavelength": "SENS:POW:WAV?",
+    "Zero": "SENSe:CORRection:COLLect:ZERO:ALL",
+    "GetIdn": "*IDN?"
+  },
+  "ResponseParser": {
+    "ReadPower": {
+      "Format": "Numeric",
+      "Unit": "dBm"
+    }
+  },
+  "WavelengthScale": 1.0,
+  "PowerScale": 1.0,
+  "PowerOffset": 0.0,
+  "ReadTimeoutMs": 3000,
+  "Extra": {}
+}

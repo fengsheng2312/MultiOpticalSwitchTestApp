@@ -1,0 +1,25 @@
+{
+  "Vendor": "Anritsu",
+  "Model": "ML910B",
+  "Protocol": "SCPI",
+  "DefaultTransport": "Serial",
+  "SerialSettings": {
+    "BaudRate": 115200,
+    "DataBits": 8,
+    "StopBits": "One",
+    "Parity": "None",
+    "Handshake": "None"
+  },
+  "Commands": {
+    "ReadPower": "READ:POW?",
+    "SetWavelength": "SENS:POW:WAV {value}",
+    "GetWavelength": "SENS:POW:WAV?",
+    "Zero": "SENS:CORR:ACQ",
+    "GetIdn": "*IDN?"
+  },
+  "WavelengthScale": 1.0,
+  "PowerScale": 1.0,
+  "PowerOffset": 0.0,
+  "ReadTimeoutMs": 3000,
+  "Extra": {}
+}

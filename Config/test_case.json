@@ -1,0 +1,49 @@
+{
+  "Version": 1,
+  "LastUpdated": "2026-08-18T14:30:00",
+  "TestBoxSn": "BOX-2026-001",
+  "Items": [
+    {
+      "TestItemId": 1,
+      "TestItemName": "Tx-Com(IL)",
+      "Channel": "CH1",
+      "SWStatus": [ "1", "1","2","0","0" ]
+    },
+    {
+      "TestItemId": 2,
+      "TestItemName": "Tx-Rx(DIR)",
+      "Channel": "CH2",
+      "SWStatus": [ "1", "1", "0", "2", "2" ]"
+    },
+    {
+      "TestItemId": 3,
+      "TestItemName": "Tx-Tx(RL)",
+      "Channel": "CH2",
+      "SWStatus": [ "1", "1", "0", "0", "3" ]
+    },
+    {
+      "TestItemId": 4,
+      "TestItemName": "Com-Rx(IL)",
+      "Channel": "CH2",
+      "SWStatus": [ "2", "0", "1", "2", "2" ]
+    },
+    {
+      "TestItemId": 5,
+      "TestItemName": "Com-Tx(ISO)",
+      "Channel": "CH2",
+      "SWStatus": [ "2", "2", "1", "0", "1" ]
+    },
+    {
+      "TestItemId": 6,
+      "TestItemName": "Com-Com(RL)",
+      "Channel": "CH2",
+      "SWStatus": [ "2", "2", "1", "0", "4" ]
+    },
+    {
+      "TestItemId": 7,
+      "TestItemName": "Rx-Com(IL)",
+      "Channel": "CH1",
+      "SWStatus": [ "3", "0", "2", "1", "0" ]
+    }
+  ]
+}

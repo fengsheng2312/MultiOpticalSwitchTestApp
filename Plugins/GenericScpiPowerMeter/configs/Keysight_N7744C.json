@@ -1,0 +1,30 @@
+{
+  "Vendor": "Keysight",
+  "Model": "N7744C",
+  "Protocol": "SCPI",
+  "DefaultTransport": "Serial",
+  "SerialSettings": {
+    "BaudRate": 115200,
+    "DataBits": 8,
+    "StopBits": "One",
+    "Parity": "None",
+    "Handshake": "None"
+  },
+  "Commands": {
+    "ReadPower": "READ2:SCALar:POWer:DC?",
+    "SetWavelength": "SENS:POW:WAV {1310} nm",
+    "GetWavelength": "SENS:POW:WAV?",
+    "Zero": "SENSe:CORRection:COLLect:ZERO:ALL",
+    "GetIdn": "*IDN?",
+    "ReadPowerCommand": "FETCH:POW?",
+    "SetWavelengthCommand": "SENS:POW:WAV {value}",
+    "GetWavelengthCommand": "SENS:POW:WAV?",
+    "ZeroCommand": "SENS:CORR:ACQ",
+    "IdentifyCommand": "*IDN?"
+  },
+  "WavelengthScale": 1.0,
+  "PowerScale": 1.0,
+  "PowerOffset": 0.0,
+  "ReadTimeoutMs": 3000,
+  "Extra": {}
+}

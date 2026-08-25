@@ -1,0 +1,32 @@
+{
+  "DeviceName": "JW8102",
+  "Vendor": "Joinwit",
+  "Model": "JW8102",
+  "Protocol": "SCPI",
+  "DefaultTransport": "Serial",
+  "SerialSettings": {
+    "BaudRate": 115200,
+    "DataBits": 8,
+    "StopBits": "One",
+    "Parity": "None",
+    "Handshake": "None"
+  },
+  "Commands": {
+    "ReadPower": "MEAS:POW?",
+    "SetWavelength": "SENS:POW:WAV {0}",
+    "GetWavelength": "SENS:POW:WAV?",
+    "Zero": "SENS:POW:ZERO",
+    "GetIdn": "*IDN?"
+  },
+  "ResponseParser": {
+    "ReadPower": {
+      "Format": "Numeric",
+      "Unit": "dBm"
+    }
+  },
+  "WavelengthScale": 1.0,
+  "PowerScale": 1.0,
+  "PowerOffset": 0.0,
+  "ReadTimeoutMs": 3000,
+  "Extra": {}
+}
