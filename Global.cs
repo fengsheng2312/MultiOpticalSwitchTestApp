@@ -16,5 +16,6 @@ namespace Free_spaceOpticalCirculatorTestApp
         public static Dictionary<string, IPowerMeterPlugin> plugins = new Dictionary<string, IPowerMeterPlugin>();
         public static IPowerMeter opticalPowermeter;
 
+        public static String readChannel = "1";
     }
 }

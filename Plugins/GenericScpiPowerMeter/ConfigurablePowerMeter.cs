@@ -1,4 +1,5 @@
-﻿using OpticalMeter.Contract;
+﻿using Free_spaceOpticalCirculatorTestApp;
+using OpticalMeter.Contract;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -75,19 +76,19 @@ namespace Plugins.GenericScpiPowerMeter
         }
 
         public async Task<double> ReadPowerAsync()
-        {
-            var cmdBytes = _protocol.Encode(_config.Commands.ReadPower, null);
-            Console.WriteLine( "1" );
+        {   
+            String readChannel = Global.readChannel;
+            Console.WriteLine($"当前读取通道: {readChannel}");
+            String cmd = _config.Commands.ReadPower.Replace("{CH}", readChannel);
+            var cmdBytes = _protocol.Encode(cmd, null);
             Console.WriteLine($"发送读取功率命令: {BitConverter.ToString(cmdBytes)}");
             var response = await _transport.SendReceiveAsync(cmdBytes);
             var rawValue = _protocol.Decode(response);
-
             // 解析数值并应用转换
             if (double.TryParse(rawValue, NumberStyles.Float, CultureInfo.InvariantCulture, out var power))
             {
                 return power * _config.PowerScale + _config.PowerOffset;
             }
-
             throw new InvalidOperationException($"无法解析功率值: {rawValue}");
         }
 

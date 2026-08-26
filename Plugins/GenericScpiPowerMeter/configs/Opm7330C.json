@@ -11,7 +11,7 @@
     "Handshake": "None"
   },
   "Commands": {
-    "ReadPower": "READ2:SCALar:POWer:DC?",
+    "ReadPower": "READ{CH}:SCALar:POWer:DC?",
     "SetWavelength": "SENS:POW:WAV {1310} nm",
     "GetWavelength": "SENS:POW:WAV?",
     "Zero": "SENSe:CORRection:COLLect:ZERO:ALL",

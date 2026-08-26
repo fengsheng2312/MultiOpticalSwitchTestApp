@@ -240,6 +240,7 @@ namespace Free_spaceOpticalCirculatorTestApp
             uiComboBox2.TabIndex = 50;
             uiComboBox2.TextAlignment = ContentAlignment.MiddleLeft;
             uiComboBox2.Watermark = "";
+            uiComboBox2.SelectedIndexChanged += uiComboBox2_SelectedIndexChanged;
             // 
             // uiLabel24
             // 
@@ -431,7 +432,7 @@ namespace Free_spaceOpticalCirculatorTestApp
             Omtransportparams.ShowText = false;
             Omtransportparams.Size = new Size(247, 29);
             Omtransportparams.TabIndex = 32;
-            Omtransportparams.Text = "COM3:115200";
+            Omtransportparams.Text = "COM3:9600";
             Omtransportparams.TextAlignment = ContentAlignment.MiddleLeft;
             Omtransportparams.Watermark = "";
             // 
@@ -920,9 +921,9 @@ namespace Free_spaceOpticalCirculatorTestApp
             uiLabel17.ForeColor = Color.FromArgb(48, 48, 48);
             uiLabel17.Location = new Point(13, 548);
             uiLabel17.Name = "uiLabel17";
-            uiLabel17.Size = new Size(150, 36);
+            uiLabel17.Size = new Size(150, 54);
             uiLabel17.TabIndex = 35;
-            uiLabel17.Text = "功率计返回结果(dbm)：";
+            uiLabel17.Text = "功率计返回结果(dbm)：（测试速度过快暂时不加）";
             // 
             // uiLabel16
             // 
@@ -1010,7 +1011,7 @@ namespace Free_spaceOpticalCirculatorTestApp
             // uiSymbolLabel1
             // 
             uiSymbolLabel1.Font = new Font("宋体", 12F, FontStyle.Regular, GraphicsUnit.Point, 134);
-            uiSymbolLabel1.Location = new Point(3, 600);
+            uiSymbolLabel1.Location = new Point(3, 605);
             uiSymbolLabel1.MinimumSize = new Size(1, 1);
             uiSymbolLabel1.Name = "uiSymbolLabel1";
             uiSymbolLabel1.Size = new Size(170, 35);

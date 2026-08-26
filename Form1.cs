@@ -71,7 +71,7 @@ namespace Free_spaceOpticalCirculatorTestApp
                 MessageBox.Show($"串口异常：{ex.Message}");
             }));
         }
-        private void Form1_Load(object sender, EventArgs e)
+        private async void Form1_Load(object sender, EventArgs e)
         {
             // 界面加载完成、控件已经创建完毕，在这里刷新串口下拉框
             _ = RefreshAllSerialPortCombosAsync();
@@ -440,7 +440,7 @@ namespace Free_spaceOpticalCirculatorTestApp
                     power = double.Parse(power2.ToString("F4"));
                     if (ReferenceEquals(_currentDevice, device))
                     {
-                        MessageBox.Show($"功率读取成功: {power2:F4} dBm", "信息");
+                        Console.WriteLine($"功率读取成功: {power2:F4} dBm");
                     }
 
                 }
@@ -647,7 +647,7 @@ namespace Free_spaceOpticalCirculatorTestApp
 
         }
         //加载插件
-        private void LoadPlugins()
+        private async Task LoadPlugins()
         {
             var pluginsDir = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Plugins");
 
@@ -834,12 +834,12 @@ namespace Free_spaceOpticalCirculatorTestApp
             // 获取某台盒子全部归零项
             // 如果有对应测试盒则获取归零项
             //{
-                //  "TestItemId": 1,
-                //"TestItemName": "Tx-Com(IL)",
-                //"Channel": "CH1",
-                //"ZeroValueDbm": -1.235,
-                //"CalibratedAt": "2026-08-18T09:00:00",
-                //"SWStatus": ["2", "6", "2"]
+            //  "TestItemId": 1,
+            //"TestItemName": "Tx-Com(IL)",
+            //"Channel": "CH1",
+            //"ZeroValueDbm": -1.235,
+            //"CalibratedAt": "2026-08-18T09:00:00",
+            //"SWStatus": ["2", "6", "2"]
             //} 
             var TestBoxSn = uiTextBox4.Text.Trim();
             Console.WriteLine($"Test Box SN: {TestBoxSn}");
@@ -860,7 +860,7 @@ namespace Free_spaceOpticalCirculatorTestApp
             Console.WriteLine($"TestId: {item.TestItemId}, TestName: {item.TestItemName} Switch Status for {selected.Text}: {string.Join(", ", switchStatus)}");
             List<String> switchList = item.SWStatus;
             //便利开关操作
-            for(int i =0;i < switchList.Count;i++)
+            for (int i = 0; i < switchList.Count; i++)
             {
                 if (switchList[i].Equals("0"))
                 {
@@ -894,7 +894,7 @@ namespace Free_spaceOpticalCirculatorTestApp
                     item.ZeroValueDbm = power;
                     MessageBox.Show($"功率读取成功: {power:F4} dBm", "信息");
                 }
-                    
+
             }
             catch (OperationCanceledException) when (!ReferenceEquals(_currentDevice, device))
             {
@@ -925,7 +925,9 @@ namespace Free_spaceOpticalCirculatorTestApp
             {
                 var power = await device.ReadPowerAsync();
                 if (ReferenceEquals(_currentDevice, device))
-                    MessageBox.Show($"功率读取成功: {power:F4} dBm", "信息");
+                {   
+                    uiTextBox1.Text = power.ToString("F4");
+                }
             }
             catch (OperationCanceledException) when (!ReferenceEquals(_currentDevice, device))
             {
@@ -1184,6 +1186,11 @@ namespace Free_spaceOpticalCirculatorTestApp
         private void rtb_Log_TextChanged(object sender, EventArgs e)
         {
 
+        }
+
+        private void uiComboBox2_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            Global.readChannel = uiComboBox2.SelectedItem?.ToString() ?? string.Empty;
         }
     }
 }
