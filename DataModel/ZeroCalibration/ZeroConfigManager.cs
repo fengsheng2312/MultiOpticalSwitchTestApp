@@ -22,7 +22,7 @@ namespace Free_spaceOpticalCirculatorTestApp.DataModel.ZeroCalibration
         {
             Console.WriteLine("进入到这里了");
             if (!File.Exists(ConfigPath))
-            {   
+            {
                 Console.WriteLine($"归零值配置文件不存在，路径: {ConfigPath}");
                 return new ZeroConfig();
             }
@@ -37,7 +37,13 @@ namespace Free_spaceOpticalCirculatorTestApp.DataModel.ZeroCalibration
             config.LastUpdated = DateTime.Now;
             Directory.CreateDirectory(Path.GetDirectoryName(ConfigPath)!);
             string json = JsonSerializer.Serialize(config, Options);
-            File.WriteAllText(ConfigPath, json);
+
+            // 【调试日志】打印真实的绝对路径
+            string fullPath = Path.GetFullPath(ConfigPath);
+            Console.WriteLine($"[ZeroConfigManager] 准备写入文件: {fullPath}");
+
+            File.WriteAllText(fullPath, json);
+            Console.WriteLine($"[ZeroConfigManager] 写入成功！文件大小: {new FileInfo(fullPath).Length} bytes");
         }
 
         /// <summary>获取或者创建指定SN的TestBox条目</summary>

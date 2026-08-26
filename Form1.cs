@@ -877,7 +877,9 @@ namespace Free_spaceOpticalCirculatorTestApp
                     //操作开关板2
                     await _switchDevice2.SwitchLightChannel(int.TryParse(switchList[i], out int channel) ? channel : 0);
                 }
+                Thread.Sleep(10); // 等待1秒，确保开关操作完成
             }
+            Thread.Sleep(200); // 等待1秒，确保开关操作完成
             //1.4 读取功率计读数，得到归零值，更新日期和归零值大小到本地json文件，更新状态UI
             //功率计通道暂时无法选择，手动修改配置表的命令可以选择读取的通道
             var device = _currentDevice;
@@ -907,7 +909,6 @@ namespace Free_spaceOpticalCirculatorTestApp
             }
             // ========== 新增：更新归零数据 ==========
             item.CalibratedAt = DateTime.Now;
-
             // 更新外层盒子的LastUpdated
             entry.LastUpdated = DateTime.Now;
             ZeroConfigManager.UpdateItem(TestBoxSn, item);
