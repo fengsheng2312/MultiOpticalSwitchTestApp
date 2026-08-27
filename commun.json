@@ -4,5 +4,5 @@
 │   └─ SerialGlobalManager.cs      // 修改后的多路静态管理器
 └─ Device
     ├─ DeviceBase.cs                // 设备基类（公共逻辑抽取）
-    ├─ OpticalSwitchDevice.cs      // 光开关业务设备
+    ├─ SwitchDevice.cs      // 机械开关业务设备
     └─ PowerMeterDevice.cs         // 功率计业务设备

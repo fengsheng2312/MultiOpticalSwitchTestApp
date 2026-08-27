@@ -432,7 +432,7 @@ namespace Free_spaceOpticalCirculatorTestApp
             Omtransportparams.ShowText = false;
             Omtransportparams.Size = new Size(247, 29);
             Omtransportparams.TabIndex = 32;
-            Omtransportparams.Text = "COM3:9600";
+            Omtransportparams.Text = "COM5:9600";
             Omtransportparams.TextAlignment = ContentAlignment.MiddleLeft;
             Omtransportparams.Watermark = "";
             // 
@@ -656,7 +656,7 @@ namespace Free_spaceOpticalCirculatorTestApp
             uiCheckBox14.Checked = true;
             uiCheckBox14.Font = new Font("宋体", 12F, FontStyle.Regular, GraphicsUnit.Point, 134);
             uiCheckBox14.ForeColor = Color.FromArgb(48, 48, 48);
-            uiCheckBox14.Location = new Point(14, 37);
+            uiCheckBox14.Location = new Point(14, 71);
             uiCheckBox14.MinimumSize = new Size(1, 1);
             uiCheckBox14.Name = "uiCheckBox14";
             uiCheckBox14.RightToLeft = RightToLeft.Yes;
@@ -669,7 +669,7 @@ namespace Free_spaceOpticalCirculatorTestApp
             // 
             uiCheckBox9.Font = new Font("宋体", 12F, FontStyle.Regular, GraphicsUnit.Point, 134);
             uiCheckBox9.ForeColor = Color.FromArgb(48, 48, 48);
-            uiCheckBox9.Location = new Point(14, 207);
+            uiCheckBox9.Location = new Point(14, 198);
             uiCheckBox9.MinimumSize = new Size(1, 1);
             uiCheckBox9.Name = "uiCheckBox9";
             uiCheckBox9.Size = new Size(150, 29);
@@ -701,7 +701,7 @@ namespace Free_spaceOpticalCirculatorTestApp
             // 
             uiCheckBox13.Font = new Font("宋体", 12F, FontStyle.Regular, GraphicsUnit.Point, 134);
             uiCheckBox13.ForeColor = Color.FromArgb(48, 48, 48);
-            uiCheckBox13.Location = new Point(14, 72);
+            uiCheckBox13.Location = new Point(14, 233);
             uiCheckBox13.MinimumSize = new Size(1, 1);
             uiCheckBox13.Name = "uiCheckBox13";
             uiCheckBox13.Size = new Size(150, 29);
@@ -729,7 +729,7 @@ namespace Free_spaceOpticalCirculatorTestApp
             // 
             uiCheckBox10.Font = new Font("宋体", 12F, FontStyle.Regular, GraphicsUnit.Point, 134);
             uiCheckBox10.ForeColor = Color.FromArgb(48, 48, 48);
-            uiCheckBox10.Location = new Point(14, 177);
+            uiCheckBox10.Location = new Point(14, 36);
             uiCheckBox10.MinimumSize = new Size(1, 1);
             uiCheckBox10.Name = "uiCheckBox10";
             uiCheckBox10.Size = new Size(150, 29);
@@ -752,7 +752,7 @@ namespace Free_spaceOpticalCirculatorTestApp
             // 
             uiCheckBox11.Font = new Font("宋体", 12F, FontStyle.Regular, GraphicsUnit.Point, 134);
             uiCheckBox11.ForeColor = Color.FromArgb(48, 48, 48);
-            uiCheckBox11.Location = new Point(14, 142);
+            uiCheckBox11.Location = new Point(14, 106);
             uiCheckBox11.MinimumSize = new Size(1, 1);
             uiCheckBox11.Name = "uiCheckBox11";
             uiCheckBox11.Size = new Size(150, 29);
@@ -788,7 +788,7 @@ namespace Free_spaceOpticalCirculatorTestApp
             // 
             uiCheckBox12.Font = new Font("宋体", 12F, FontStyle.Regular, GraphicsUnit.Point, 134);
             uiCheckBox12.ForeColor = Color.FromArgb(48, 48, 48);
-            uiCheckBox12.Location = new Point(14, 107);
+            uiCheckBox12.Location = new Point(14, 172);
             uiCheckBox12.MinimumSize = new Size(1, 1);
             uiCheckBox12.Name = "uiCheckBox12";
             uiCheckBox12.Size = new Size(150, 29);
@@ -831,7 +831,7 @@ namespace Free_spaceOpticalCirculatorTestApp
             // 
             uiCheckBox8.Font = new Font("宋体", 12F, FontStyle.Regular, GraphicsUnit.Point, 134);
             uiCheckBox8.ForeColor = Color.FromArgb(48, 48, 48);
-            uiCheckBox8.Location = new Point(14, 242);
+            uiCheckBox8.Location = new Point(14, 137);
             uiCheckBox8.MinimumSize = new Size(1, 1);
             uiCheckBox8.Name = "uiCheckBox8";
             uiCheckBox8.Size = new Size(150, 29);
@@ -1001,7 +1001,7 @@ namespace Free_spaceOpticalCirculatorTestApp
             uiLabel7.AutoSize = true;
             uiLabel7.Font = new Font("宋体", 12F, FontStyle.Regular, GraphicsUnit.Point, 134);
             uiLabel7.ForeColor = Color.FromArgb(48, 48, 48);
-            uiLabel7.Location = new Point(137, 41);
+            uiLabel7.Location = new Point(160, 41);
             uiLabel7.MaximumSize = new Size(300, 150);
             uiLabel7.Name = "uiLabel7";
             uiLabel7.Size = new Size(239, 32);
@@ -1032,7 +1032,7 @@ namespace Free_spaceOpticalCirculatorTestApp
             // uiRadioButton8
             // 
             uiRadioButton8.Font = new Font("宋体", 12F, FontStyle.Regular, GraphicsUnit.Point, 134);
-            uiRadioButton8.Location = new Point(13, 245);
+            uiRadioButton8.Location = new Point(13, 140);
             uiRadioButton8.MinimumSize = new Size(1, 1);
             uiRadioButton8.Name = "uiRadioButton8";
             uiRadioButton8.Size = new Size(150, 29);
@@ -1042,7 +1042,7 @@ namespace Free_spaceOpticalCirculatorTestApp
             // uiRadioButton9
             // 
             uiRadioButton9.Font = new Font("宋体", 12F, FontStyle.Regular, GraphicsUnit.Point, 134);
-            uiRadioButton9.Location = new Point(13, 210);
+            uiRadioButton9.Location = new Point(13, 208);
             uiRadioButton9.MinimumSize = new Size(1, 1);
             uiRadioButton9.Name = "uiRadioButton9";
             uiRadioButton9.Size = new Size(150, 29);
@@ -1052,7 +1052,7 @@ namespace Free_spaceOpticalCirculatorTestApp
             // uiRadioButton10
             // 
             uiRadioButton10.Font = new Font("宋体", 12F, FontStyle.Regular, GraphicsUnit.Point, 134);
-            uiRadioButton10.Location = new Point(13, 175);
+            uiRadioButton10.Location = new Point(13, 37);
             uiRadioButton10.MinimumSize = new Size(1, 1);
             uiRadioButton10.Name = "uiRadioButton10";
             uiRadioButton10.Size = new Size(150, 29);
@@ -1062,7 +1062,7 @@ namespace Free_spaceOpticalCirculatorTestApp
             // uiRadioButton11
             // 
             uiRadioButton11.Font = new Font("宋体", 12F, FontStyle.Regular, GraphicsUnit.Point, 134);
-            uiRadioButton11.Location = new Point(13, 140);
+            uiRadioButton11.Location = new Point(13, 105);
             uiRadioButton11.MinimumSize = new Size(1, 1);
             uiRadioButton11.Name = "uiRadioButton11";
             uiRadioButton11.Size = new Size(150, 29);
@@ -1072,7 +1072,7 @@ namespace Free_spaceOpticalCirculatorTestApp
             // uiRadioButton12
             // 
             uiRadioButton12.Font = new Font("宋体", 12F, FontStyle.Regular, GraphicsUnit.Point, 134);
-            uiRadioButton12.Location = new Point(13, 105);
+            uiRadioButton12.Location = new Point(13, 175);
             uiRadioButton12.MinimumSize = new Size(1, 1);
             uiRadioButton12.Name = "uiRadioButton12";
             uiRadioButton12.Size = new Size(150, 29);
@@ -1082,7 +1082,7 @@ namespace Free_spaceOpticalCirculatorTestApp
             // uiRadioButton13
             // 
             uiRadioButton13.Font = new Font("宋体", 12F, FontStyle.Regular, GraphicsUnit.Point, 134);
-            uiRadioButton13.Location = new Point(13, 70);
+            uiRadioButton13.Location = new Point(13, 247);
             uiRadioButton13.MinimumSize = new Size(1, 1);
             uiRadioButton13.Name = "uiRadioButton13";
             uiRadioButton13.Size = new Size(150, 29);
@@ -1092,7 +1092,7 @@ namespace Free_spaceOpticalCirculatorTestApp
             // uiRadioButton14
             // 
             uiRadioButton14.Font = new Font("宋体", 12F, FontStyle.Regular, GraphicsUnit.Point, 134);
-            uiRadioButton14.Location = new Point(13, 35);
+            uiRadioButton14.Location = new Point(13, 72);
             uiRadioButton14.MinimumSize = new Size(1, 1);
             uiRadioButton14.Name = "uiRadioButton14";
             uiRadioButton14.Size = new Size(150, 29);

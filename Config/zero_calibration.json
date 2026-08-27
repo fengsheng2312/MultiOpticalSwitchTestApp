@@ -7,7 +7,7 @@
       "LastUpdated": "2026-08-18T14:30:00",
       "Items": [
         {
-          "TestItemId": 1,
+          "TestItemId":2 ,
           "TestItemName": "Tx-Com(IL)",
           "Channel": "CH1",
           "ZeroValueDbm": -1.235,
@@ -15,7 +15,7 @@
           "SWStatus": [ "2", "6", "0","2" ]
         },
         {
-          "TestItemId": 2,
+          "TestItemId":7 ,
           "TestItemName": "Tx-Rx(DIR)",
           "Channel": "CH2",
           "ZeroValueDbm": -1.180,
@@ -23,7 +23,7 @@
           "SWStatus": [ "2","6","8", "3" ]
         },
         {
-          "TestItemId": 3,
+          "TestItemId": 5,
           "TestItemName": "Tx-Tx(RL)",
           "Channel": "CH1",
           "ZeroValueDbm": -0.950,
@@ -31,7 +31,7 @@
           "SWStatus": [ "2", "6", "0","1" ]
         },
         {
-          "TestItemId": 4,
+          "TestItemId": 3,
           "TestItemName": "Com-Rx(IL)",
           "Channel": "CH2",
           "ZeroValueDbm": -1.310,
@@ -39,7 +39,7 @@
           "SWStatus": [ "2", "5", "8", "3" ]
         },
         {
-          "TestItemId": 5,
+          "TestItemId":1 ,
           "TestItemName": "Com-Tx(ISO)",
           "Channel": "CH2",
           "ZeroValueDbm": -1.270,
@@ -55,7 +55,7 @@
           "SWStatus": [ "2", "5", "0", "2" ]
         },
         {
-          "TestItemId": 7,
+          "TestItemId": 4,
           "TestItemName": "Rx-Com(ISO)",
           "Channel": "CH1",
           "ZeroValueDbm": -1.290,

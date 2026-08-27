@@ -421,10 +421,17 @@ namespace Free_spaceOpticalCirculatorTestApp
                     }
                     else
                     {
+                        if (switchList[i].Equals("1") || switchList[i].Equals("3"))
+                        {
+                            await _switchDevice2.SwitchLightChannel(2);
+                            Thread.Sleep(10); // 等待1秒，确保开关操作完成
+                        }
                         //操作开关板2
                         await _switchDevice2.SwitchLightChannel(int.TryParse(switchList[i], out int channel) ? channel : 0);
                     }
+                    await Task.Delay(10);
                 }
+                await Task.Delay(300); // 等待100毫秒，确保开关操作完成
                 //1.4 读取功率计读数，得到归零值，更新日期和归零值大小到本地json文件，更新状态UI
                 //功率计通道暂时无法选择，手动修改配置表的命令可以选择读取的通道
                 double power = 0.0;
@@ -875,11 +882,16 @@ namespace Free_spaceOpticalCirculatorTestApp
                 else
                 {
                     //操作开关板2
+                    if(switchList[i].Equals("1") || switchList[i].Equals("3"))
+                    {
+                        await _switchDevice2.SwitchLightChannel(2);
+                        Thread.Sleep(10); // 等待1秒，确保开关操作完成
+                    }
                     await _switchDevice2.SwitchLightChannel(int.TryParse(switchList[i], out int channel) ? channel : 0);
                 }
-                Thread.Sleep(10); // 等待1秒，确保开关操作完成
+                await Task.Delay(10); // 等待10m秒，确保开关操作完成
             }
-            Thread.Sleep(200); // 等待1秒，确保开关操作完成
+            await Task.Delay(300); // 等待0.3秒，确保开关操作完成
             //1.4 读取功率计读数，得到归零值，更新日期和归零值大小到本地json文件，更新状态UI
             //功率计通道暂时无法选择，手动修改配置表的命令可以选择读取的通道
             var device = _currentDevice;
