@@ -37,6 +37,52 @@ namespace Free_spaceOpticalCirculatorTestApp
             BindCombo(uiComboBox1);
             BindCombo(uiComboBox3);
             this.Load += Form1_Load;
+
+        }
+        private async Task DoBindFixAsync()
+        {
+            await BindFixTextBoxFocusAsync(this);
+        }
+
+        /// <summary>
+        /// 分段递归绑定，大量控件不阻塞UI
+        /// </summary>
+        private async Task BindFixTextBoxFocusAsync(Control parent)
+        {
+            int count = 0;
+            foreach (Control ctl in parent.Controls)
+            {
+                if (ctl is TextBoxBase tb)
+                {
+                    tb.MouseDown -= TextBoxFix_MouseDown;
+                    tb.MouseDown += TextBoxFix_MouseDown;
+                }
+
+                if (ctl.HasChildren)
+                {
+                    await BindFixTextBoxFocusAsync(ctl);
+                }
+
+                count++;
+                if (count >= 20)
+                {
+                    count = 0;
+                    await Task.Delay(1); // 让出UI消息循环
+                }
+            }
+        }
+
+        private void TextBoxFix_MouseDown(object sender, MouseEventArgs e)
+        {
+            var tb = sender as TextBoxBase;
+            if (tb == null) return;
+
+            // 这里鼠标点击时控件一定有句柄，BeginInvoke安全
+            tb.BeginInvoke(new Action(() =>
+            {
+                tb.Focus();
+                tb.Select();
+            }));
         }
         private void Form_MouseClick(object sender, System.Windows.Forms.MouseEventArgs e)
         {
@@ -104,6 +150,7 @@ namespace Free_spaceOpticalCirculatorTestApp
             {
                 SwitchBaudrate.SelectedIndex = 0;  // 代码可以写，属性面板看不见
             }
+            _ = DoBindFixAsync();
         }
         private void SwitchDevice_OnDeviceFrameComplete(byte[] frameBytes)
         {
@@ -511,17 +558,17 @@ namespace Free_spaceOpticalCirculatorTestApp
             }
             return null;
         }
-        private void UpdateMarkLabel(string text)
-        {
-            if (uiMarkLabel1.InvokeRequired)
-            {
-                uiMarkLabel1.BeginInvoke(new Action(() => UpdateMarkLabel(text)));
-            }
-            else
-            {
-                uiMarkLabel1.Text = text;
-            }
-        }
+        //private void UpdateMarkLabel(string text)
+        //{
+        //    if (uiMarkLabel1.InvokeRequired)
+        //    {
+        //        uiMarkLabel1.BeginInvoke(new Action(() => UpdateMarkLabel(text)));
+        //    }
+        //    else
+        //    {
+        //        uiMarkLabel1.Text = text;
+        //    }
+        //}
         private async void uiButton1_Click_1(object sender, EventArgs e)
         {
             ITransport? transport = null;
@@ -882,7 +929,7 @@ namespace Free_spaceOpticalCirculatorTestApp
                 else
                 {
                     //操作开关板2
-                    if(switchList[i].Equals("1") || switchList[i].Equals("3"))
+                    if (switchList[i].Equals("1") || switchList[i].Equals("3"))
                     {
                         await _switchDevice2.SwitchLightChannel(2);
                         Thread.Sleep(10); // 等待1秒，确保开关操作完成
@@ -906,6 +953,7 @@ namespace Free_spaceOpticalCirculatorTestApp
                 if (ReferenceEquals(_currentDevice, device))
                 {
                     item.ZeroValueDbm = power;
+                    uiTextBox6.Text = power.ToString("F4");
                     MessageBox.Show($"功率读取成功: {power:F4} dBm", "信息");
                 }
 
@@ -938,7 +986,7 @@ namespace Free_spaceOpticalCirculatorTestApp
             {
                 var power = await device.ReadPowerAsync();
                 if (ReferenceEquals(_currentDevice, device))
-                {   
+                {
                     uiTextBox1.Text = power.ToString("F4");
                 }
             }
@@ -1204,6 +1252,186 @@ namespace Free_spaceOpticalCirculatorTestApp
         private void uiComboBox2_SelectedIndexChanged(object sender, EventArgs e)
         {
             Global.readChannel = uiComboBox2.SelectedItem?.ToString() ?? string.Empty;
+        }
+
+        private void uiButton10_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                // 程序运行目录，如 ...\bin\Debug\net10.0-windows\
+                string appDir = AppContext.BaseDirectory;
+
+                // 拼接 Config 文件夹路径
+                string configDir = Path.Combine(appDir, "Config");
+
+                // 不存在则自动创建
+                if (!Directory.Exists(configDir))
+                {
+                    Directory.CreateDirectory(configDir);
+                }
+
+                // 用资源管理器打开
+                System.Diagnostics.Process.Start("explorer.exe", configDir);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(
+                    $"打开 Config 文件夹失败：{ex.Message}",
+                    "错误",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Error);
+            }
+        }
+
+        private async void uiButton11_Click(object sender, EventArgs e)
+        {
+            await PassFailTest.RunAllAndWriteExcel();
+        }
+
+        private async void uiButton12_Click(object sender, EventArgs e)
+        {
+            var TestBoxSn = uiTextBox4.Text.Trim();
+            TestBoxZeroEntry entry = ZeroConfigManager.GetOrCreateBoxEntry(TestBoxSn);
+            List<ZeroCalibration> Items = entry.Items;
+            ZeroCalibration? item = Items.FirstOrDefault(x => x.TestItemName == "Tx-Com(IL)");
+            //查不到测试盒就提示 然后不再执行
+            if (item == null)
+            {
+                MessageBox.Show($"未找到测试盒 {TestBoxSn} 的归零项，请检查输入的测试盒序列号是否正确是否存在于Config/zero_calibration.json。", "提示", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+            //1.2 根据测试项内容，查询本地json文件，获取对应的开关状态数组；
+            List<String> switchList = item.SWStatus;
+            //1.3 根据开关状态数组，执行对应的开关操作；
+            //获取一下TestItemId，方便后续写入json文件
+            //便利开关操作
+            for (int i = 0; i < switchList.Count; i++)
+            {
+                if (switchList[i].Equals("0"))
+                {
+                    continue;
+                }
+                if (i < 3)
+                {
+                    //操作开关板1
+                    await _switchDevice.SwitchLightChannel(int.TryParse(switchList[i], out int channel) ? channel : 0);
+
+                }
+                else
+                {
+                    //操作开关板2
+                    if (switchList[i].Equals("1") || switchList[i].Equals("3"))
+                    {
+                        await _switchDevice2.SwitchLightChannel(2);
+                        Thread.Sleep(10); // 等待1秒，确保开关操作完成
+                    }
+                    await _switchDevice2.SwitchLightChannel(int.TryParse(switchList[i], out int channel) ? channel : 0);
+                }
+                await Task.Delay(10); // 等待10m秒，确保开关操作完成
+            }
+            await Task.Delay(300); // 等待0.3秒，确保开关操作完成
+            //1.4 读取功率计读数，得到归零值，更新日期和归零值大小到本地json文件，更新状态UI
+            //功率计通道暂时无法选择，手动修改配置表的命令可以选择读取的通道
+            var device = _currentDevice;
+            if (device == null || !device.IsConnected)
+            {
+                MessageBox.Show("请先连接功率计", "提示");
+                return;
+            }
+            try
+            {
+                var power = await device.ReadPowerAsync();
+                if (ReferenceEquals(_currentDevice, device))
+                {
+                    uiTextBox6.Text = power.ToString("F4");
+                }
+
+            }
+            catch (OperationCanceledException) when (!ReferenceEquals(_currentDevice, device))
+            {
+                // Disconnect canceled the pending read.
+            }
+            catch (Exception ex)
+            {
+                if (ReferenceEquals(_currentDevice, device))
+                    MessageBox.Show($"功率读取失败: {ex.Message}", "错误");
+            }
+        }
+
+        private async void uiButton13_Click(object sender, EventArgs e)
+        {
+            var TestBoxSn = uiTextBox4.Text.Trim();
+            TestBoxZeroEntry entry = ZeroConfigManager.GetOrCreateBoxEntry(TestBoxSn);
+            List<ZeroCalibration> Items = entry.Items;
+            ZeroCalibration? item = Items.FirstOrDefault(x => x.TestItemName == "Com-Rx(IL)");
+            //查不到测试盒就提示 然后不再执行
+            if (item == null)
+            {
+                MessageBox.Show($"未找到测试盒 {TestBoxSn} 的归零项，请检查输入的测试盒序列号是否正确是否存在于Config/zero_calibration.json。", "提示", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+            //1.2 根据测试项内容，查询本地json文件，获取对应的开关状态数组；
+            List<String> switchStatus = item.SWStatus;
+            //1.3 根据开关状态数组，执行对应的开关操作；
+            //获取一下TestItemId，方便后续写入json文件
+            List<String> switchList = item.SWStatus;
+            //便利开关操作
+            for (int i = 0; i < switchList.Count; i++)
+            {
+                if (switchList[i].Equals("0"))
+                {
+                    continue;
+                }
+                if (i < 3)
+                {
+                    //操作开关板1
+                    await _switchDevice.SwitchLightChannel(int.TryParse(switchList[i], out int channel) ? channel : 0);
+
+                }
+                else
+                {
+                    //操作开关板2
+                    if (switchList[i].Equals("1") || switchList[i].Equals("3"))
+                    {
+                        await _switchDevice2.SwitchLightChannel(2);
+                        Thread.Sleep(10); // 等待1秒，确保开关操作完成
+                    }
+                    await _switchDevice2.SwitchLightChannel(int.TryParse(switchList[i], out int channel) ? channel : 0);
+                }
+                await Task.Delay(10); // 等待10m秒，确保开关操作完成
+            }
+            await Task.Delay(300); // 等待0.3秒，确保开关操作完成
+            //1.4 读取功率计读数，得到归零值，更新日期和归零值大小到本地json文件，更新状态UI
+            //功率计通道暂时无法选择，手动修改配置表的命令可以选择读取的通道
+            var device = _currentDevice;
+            if (device == null || !device.IsConnected)
+            {
+                MessageBox.Show("请先连接功率计", "提示");
+                return;
+            }
+            try
+            {
+                var power = await device.ReadPowerAsync();
+                if (ReferenceEquals(_currentDevice, device))
+                {
+                    uiTextBox6.Text = power.ToString("F4");
+                }
+
+            }
+            catch (OperationCanceledException) when (!ReferenceEquals(_currentDevice, device))
+            {
+                // Disconnect canceled the pending read.
+            }
+            catch (Exception ex)
+            {
+                if (ReferenceEquals(_currentDevice, device))
+                    MessageBox.Show($"功率读取失败: {ex.Message}", "错误");
+            }
+        }
+
+        private void uiButton14_Click(object sender, EventArgs e)
+        {
+            rtb_Log.Clear();
         }
     }
 }

@@ -48,6 +48,75 @@ namespace Free_spaceOpticalCirculatorTestApp.FileOperation
             "功率计回读值", "测试结果(差值)", "归零日期",
             "测试日期时间（YYYY-MM-DD HH:MM:SS）", "测试结论"
         };
+        //判定类：
+        private enum CompareType
+        {
+            GreaterOrEqual,  // ≥
+            LessOrEqual      // ≤
+        }
+
+        private class PassFailRule
+        {
+            public double Threshold { get; set; }
+            public CompareType Compare { get; set; }
+        }
+
+        // 测试项判定规则表
+        private static readonly Dictionary<string, PassFailRule> _passFailRules =
+            new(StringComparer.OrdinalIgnoreCase)
+            {
+                ["Com-Tx(ISO)"] = new() { Threshold = 21, Compare = CompareType.GreaterOrEqual },
+                ["Tx-Com(IL)"] = new() { Threshold = 0.3, Compare = CompareType.LessOrEqual },
+                ["Com-Rx(IL)"] = new() { Threshold = 0.5, Compare = CompareType.LessOrEqual },
+                ["Rx-Com(ISO)"] = new() { Threshold = 21, Compare = CompareType.GreaterOrEqual },
+                ["Tx-Tx(RL)"] = new() { Threshold = 35, Compare = CompareType.GreaterOrEqual },
+                ["Com-Com(RL)"] = new() { Threshold = 35, Compare = CompareType.GreaterOrEqual },
+                ["Tx-Rx(DIR)"] = new() { Threshold = 35, Compare = CompareType.GreaterOrEqual },
+            };
+
+        /// <summary>
+        /// 按 TestItemName 判定 Pass/Fail
+        /// </summary>
+        public static bool JudgePassFail(string testItemName, double testResult)
+        {
+            if (string.IsNullOrWhiteSpace(testItemName))
+                return false;
+
+            if (!_passFailRules.TryGetValue(testItemName.Trim(), out var rule))
+            {
+                // 未配置规则的测试项：默认 FAIL，避免漏判
+                return false;
+            }
+
+            return rule.Compare switch
+            {
+                CompareType.GreaterOrEqual => testResult >= rule.Threshold,
+                CompareType.LessOrEqual => testResult <= rule.Threshold,
+                _ => false
+            };
+        }
+
+        /// <summary>
+        /// 去除前面的"数字-"前缀，拿到真实测试项名称
+        /// 示例："5-Tx-Tx(RL)" → "Tx-Tx(RL)"
+        /// </summary>
+        private static string ExtractRealTestItemName(string rawName)
+        {
+            if (string.IsNullOrWhiteSpace(rawName))
+                return string.Empty;
+
+            // 找到第一个 '-'，如果前面是数字，就截取后面部分
+            var idx = rawName.IndexOf('-');
+            if (idx > 0)
+            {
+                string prefix = rawName.Substring(0, idx);
+                if (int.TryParse(prefix, out _))
+                {
+                    return rawName.Substring(idx + 1).Trim();
+                }
+            }
+            return rawName.Trim();
+        }
 
         /// <summary>
         /// 追加一条测试结果到当日 Excel（每次调用只写一行）
@@ -57,10 +126,10 @@ namespace Free_spaceOpticalCirculatorTestApp.FileOperation
         /// <param name="row">本次测试项的数据</param>
         /// <param name="operatorName">操作员</param>
         /// <param name="specMax">规格上限(dB)，超过则判定FAIL</param>
-        public static void AppendResult(
+        public static async Task AppendResult(
     TestResultRow row,
-    string operatorName,
-    double specMax = 1.5)
+    string operatorName
+    )
         {
             try
             {
@@ -111,12 +180,13 @@ namespace Free_spaceOpticalCirculatorTestApp.FileOperation
                 sheet.Cells[currentRow, 5].Value = Math.Round(row.ZeroValue, 4);                               // 归零值
                 sheet.Cells[currentRow, 6].Value = Math.Round(row.ZeroSupplement, 4);                          // 归零补充值
                 sheet.Cells[currentRow, 7].Value = Math.Round(row.PowerMeterReading, 4);                       // 功率计回读值
-                sheet.Cells[currentRow, 8].Value = Math.Round(row.TestResult, 3);                              // 测试结果(差值)
+                sheet.Cells[currentRow, 8].Value = Math.Round(row.TestResult, 3);         
                 sheet.Cells[currentRow, 9].Value = row.ZeroDate.ToString("yyyy-MM-dd");                                                                                               // ★ 关键修复：ZeroDate 可能为 null
                 sheet.Cells[currentRow, 10].Value = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");              // 测试日期时间
 
                 // 测试结论：差值超规格标红 + FAIL
-                bool pass = Math.Abs(row.TestResult) <= specMax;
+                string realItem = ExtractRealTestItemName(row.TestItemName);
+                bool pass = JudgePassFail(realItem, Math.Abs(row.TestResult));
                 sheet.Cells[currentRow, 11].Value = pass ? "PASS" : "FAIL";
                 sheet.Cells[currentRow, 11].Style.Font.Color.SetColor(pass ? Color.Green : Color.Red);
                 sheet.Cells[currentRow, 11].Style.Font.Bold = true;
@@ -145,8 +215,8 @@ namespace Free_spaceOpticalCirculatorTestApp.FileOperation
                     "Excel写入失败",
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Error);
-            
-            throw; // 如果需要上层处理则保留 throw；如果只需要静默记录则删掉这行
+
+                throw; // 如果需要上层处理则保留 throw；如果只需要静默记录则删掉这行
             }
         }
 
