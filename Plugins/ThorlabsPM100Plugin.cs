@@ -12,6 +12,12 @@ namespace Plugins.ThorlabsPM100
 
         public IReadOnlyList<string> SupportedModels => new[] { "PM100D", "PM100USB" };
         public IReadOnlyList<string> SupportedTransports => new[] { "USB-HID", "Serial" };
+
+        public IReadOnlyList<string> GetSupportedTransports(string model)
+        {
+            return SupportedTransports;
+        }
+
         public IPowerMeter Create(
             ITransport transport,
             IProtocol protocol,

@@ -17,5 +17,9 @@ namespace Free_spaceOpticalCirculatorTestApp
         public static IPowerMeter opticalPowermeter;
 
         public static String readChannel = "1";
+
+        public static double Tx_comZeroVal = 0;
+
+        public static double Com_rxZeroVal = 0;
     }
 }

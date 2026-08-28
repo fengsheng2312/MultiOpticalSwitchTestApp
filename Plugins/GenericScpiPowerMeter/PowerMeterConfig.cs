@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using System.Net;
 
 namespace Plugins.GenericScpiPowerMeter
 {
@@ -19,8 +20,11 @@ namespace Plugins.GenericScpiPowerMeter
         /// <summary>默认传输方式（如 "Serial" / "TCP"）</summary>
         public string DefaultTransport { get; set; } = "Serial";
 
+        public List<TransportType>? SupportedTransports { get; set; } = [];
+
         /// <summary>串口参数（传输方式为 Serial 时使用）</summary>
         public SerialSettings SerialSettings { get; set; } = new SerialSettings();
+
 
         /// <summary>SCPI 命令集合</summary>
         public Command Commands { get; set; } = new Command();

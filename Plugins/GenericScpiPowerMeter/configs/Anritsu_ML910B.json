@@ -3,6 +3,7 @@
   "Model": "ML910B",
   "Protocol": "SCPI",
   "DefaultTransport": "Serial",
+  "SupportedTransports": [ "Serial","TCP" ],
   "SerialSettings": {
     "BaudRate": 115200,
     "DataBits": 8,
@@ -12,7 +13,7 @@
   },
   "Commands": {
     "ReadPower": "READ:POW?",
-    "SetWavelength": "SENS:POW:WAV {value}",
+    "SetWavelength": "SENS:POW:WAV {waveLen} nm",
     "GetWavelength": "SENS:POW:WAV?",
     "Zero": "SENS:CORR:ACQ",
     "GetIdn": "*IDN?"

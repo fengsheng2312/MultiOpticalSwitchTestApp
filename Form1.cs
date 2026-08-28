@@ -121,7 +121,7 @@ namespace Free_spaceOpticalCirculatorTestApp
         {
             // 界面加载完成、控件已经创建完毕，在这里刷新串口下拉框
             _ = RefreshAllSerialPortCombosAsync();
-            LoadPlugins();
+            await LoadPlugins();
             var cbos = new UIComboBox[] { SwitchBaudrate, uiComboBox4 };
             uiComboBox2.SelectedIndex = 0;
             foreach (var cbo in cbos)
@@ -517,7 +517,7 @@ namespace Free_spaceOpticalCirculatorTestApp
                 double IL = 0.0;
                 IL = comboBox1.Text.Trim().Equals("自由空间类") ? power - zeroValue - collimatorLoss : power - zeroValue;
                 //3.填入测试结果到excel表里
-                TestResultExcelWriter.AppendResult(new TestResultRow
+                await TestResultExcelWriter.AppendResult(new TestResultRow
                 {
                     DutSn = DutSn,
                     DutType = DutType,
@@ -631,9 +631,25 @@ namespace Free_spaceOpticalCirculatorTestApp
                 Console.WriteLine("有找到插件");
                 connectButton.Enabled = false;
                 transport = CreateTransport();
-                Console.WriteLine($"[DEBUG] 创建传输协议成功: {transport.GetType().Name}");
-                // ★ 调用插件给的工厂，MainForm 不 new 任何协议
-                var protocol = CreateProtocol();
+                Console.WriteLine($"[DEBUG] 创建传输成功: {transport.GetType().Name}");
+
+                // ✅ 真正调用插件提供的协议工厂，MainForm 不 new 任何协议
+                var protocolOptions = plugin.GetProtocolOptions()?.ToList();
+                var protocolFactory = protocolOptions?
+                    .FirstOrDefault(p => string.Equals(p.Item1, protocolName, StringComparison.OrdinalIgnoreCase))
+                    .Item2;
+
+                if (protocolFactory == null)
+                {
+                    MessageBox.Show($"插件未提供协议 [{protocolName}] 的工厂实现", "错误");
+                    connectButton.Enabled = true;
+                    transport.Dispose();
+                    return;
+                }
+
+                var protocol = protocolFactory.Invoke();
+                Console.WriteLine($"[DEBUG] 使用插件工厂创建协议: {protocol.GetType().Name}");
+
                 Console.WriteLine($"[DEBUG] 找到插件: {plugin?.GetType().Name} 协议: {protocolName} 传输: {transportName}");
                 //_currentDevice = plugin.Create(transport, protocol, new Dictionary<string, string>());
                 await transport.OpenAsync(Omtransportparams.Text);
@@ -719,6 +735,7 @@ namespace Free_spaceOpticalCirculatorTestApp
                 }
             }
             var powerMeterPlugin = new GenericScpiPowerMeterPlugin();
+            _pluginManager.ScanAndLoad(pluginsDir);
             _pluginManager.RegisterPlugin(powerMeterPlugin);
             var allModels = new List<string>();
             foreach (var plugin in _pluginManager.Plugins)
@@ -732,7 +749,6 @@ namespace Free_spaceOpticalCirculatorTestApp
                 Console.WriteLine($"Supported Model: {model}");
             }
 
-            //_pluginManager.ScanAndLoad(pluginsDir);
 
             //// 填充插件列表 —— ★ 新增：显示支持的传输方式
             //// ★ 填充前移除事件，避免逐个 Add 时反复触发 SelectedIndexChanged
@@ -753,40 +769,204 @@ namespace Free_spaceOpticalCirculatorTestApp
             //_lblStatus.Text = $"就绪 | 已加载 {_pluginManager.Plugins.Count} 个插件";
         }
 
+        //private void Ommodel_SelectedIndexChanged(object sender, EventArgs e)
+        //{
+        //    var model = Ommodel.SelectedItem?.ToString();
+
+        //    if (Ommodel.SelectedIndex < 0 || Ommodel.Items.Count == 0 || string.IsNullOrWhiteSpace(model))
+        //    {
+        //        Omtransport.Items.Clear();
+        //        Omprotocol.Items.Clear();
+        //        return;
+        //    }
+
+        //    var plugin = _pluginManager.FindPlugin(model);
+        //    if (plugin == null)
+        //    {
+        //        Omtransport.Items.Clear();
+        //        Omprotocol.Items.Clear();
+        //        Console.WriteLine($"[WARN] 找不到型号插件: {model}");
+        //        return;
+        //    }
+
+        //    // ==========关键改动：强转拿到插件内部配置字典==========
+        //    if (plugin is not Plugins.GenericScpiPowerMeter.GenericScpiPowerMeterPlugin scpiPlugin)
+        //    {
+        //        Omtransport.Items.Clear();
+        //        Omprotocol.Items.Clear();
+        //        Console.WriteLine($"[WARN] {model} 不是SCPI功率计插件");
+        //        return;
+        //    }
+
+        //    if (!scpiPlugin.DeviceConfigs.TryGetValue(model, out PowerMeterConfig? cfg))
+        //    {
+        //        Omtransport.Items.Clear();
+        //        Omprotocol.Items.Clear();
+        //        Console.WriteLine($"[WARN] 在插件DeviceConfigs找不到型号配置:{model}");
+        //        return;
+        //    }
+
+        //    Omtransport.Items.Clear();
+        //    Omprotocol.Items.Clear();
+
+        //    // =========填充协议下拉=========
+        //    if (plugin.SupportedProtocols != null && plugin.SupportedProtocols.Count > 0)
+        //    {
+        //        foreach (var protocol in plugin.SupportedProtocols)
+        //        {
+        //            Omprotocol.Items.Add(protocol);
+        //            Console.WriteLine($"[DEBUG] 型号 '{model}' 支持协议: {protocol}");
+        //        }
+        //    }
+        //    else
+        //    {
+        //        Console.WriteLine($"[WARN] 型号 '{model}' SupportedProtocols为空");
+        //    }
+
+        //    // =========填充传输下拉：优先JSON配置，没有则回退接口plugin.SupportedTransports=========
+        //    List<string> transportItems = new List<string>();
+
+        //    if (cfg.SupportedTransports != null && cfg.SupportedTransports.Count > 0)
+        //    {
+        //        foreach (var t in cfg.SupportedTransports)
+        //        {   
+        //            Console.WriteLine($"[DEBUG] {model} SupportedTransports from JSON: {t}");
+        //            var s = t.ToString();
+        //            transportItems.Add(s);
+        //            Omtransport.Items.Add(s);
+        //            Console.WriteLine($"[DEBUG][FromJson] {model} supported transport:{s}");
+        //        }
+        //    }
+        //    else
+        //    {
+        //        foreach (var s in plugin.SupportedTransports)
+        //        {
+        //            transportItems.Add(s);
+        //            Omtransport.Items.Add(s);
+        //            Console.WriteLine($"[DEBUG][FromPluginInterface] {model} supported transport:{s}");
+        //        }
+        //    }
+
+        //    // =========协议默认选中=========
+        //    if (Omprotocol.Items.Count > 0)
+        //    {
+        //        Omprotocol.SelectedIndex = 0;
+        //    }
+
+        //    // =========传输：优先匹配cfg.DefaultTransport=========
+        //    int selectedTransportIndex = -1;
+        //    string defaultTransConfig = cfg.DefaultTransport ?? string.Empty;
+
+        //    if (!string.IsNullOrWhiteSpace(defaultTransConfig) && Omtransport.Items.Count > 0)
+        //    {
+        //        for (int i = 0; i < Omtransport.Items.Count; i++)
+        //        {
+        //            string? itemText = Omtransport.Items[i]?.ToString();
+        //            if (string.Equals(itemText, defaultTransConfig, StringComparison.OrdinalIgnoreCase))
+        //            {
+        //                selectedTransportIndex = i;
+        //                break;
+        //            }
+        //        }
+        //    }
+
+        //    if (selectedTransportIndex >= 0)
+        //    {
+        //        Omtransport.SelectedIndex = selectedTransportIndex;
+        //    }
+        //    else if (Omtransport.Items.Count > 0)
+        //    {
+        //        Omtransport.SelectedIndex = 0;
+        //        Console.WriteLine($"[WARN] 未匹配DefaultTransport[{defaultTransConfig}]，回退第一项");
+        //    }
+        //}
+
         private void Ommodel_SelectedIndexChanged(object sender, EventArgs e)
         {
             var model = Ommodel.SelectedItem?.ToString();
-            if (Ommodel.SelectedIndex < 0 || Ommodel.Items.Count == 0)
+
+            if (Ommodel.SelectedIndex < 0 || Ommodel.Items.Count == 0 || string.IsNullOrWhiteSpace(model))
+            {
+                Omtransport.Items.Clear();
+                Omprotocol.Items.Clear();
                 return;
-            if (model == null) return;
+            }
 
             var plugin = _pluginManager.FindPlugin(model);
-            if (plugin == null) return;
+            if (plugin == null)
+            {
+                Omtransport.Items.Clear();
+                Omprotocol.Items.Clear();
+                Console.WriteLine($"[WARN] 找不到型号插件: {model}");
+                return;
+            }
+
+            Console.WriteLine($"[INFO] 选中型号: {model}, 插件: {plugin.GetType().Name}");
 
             Omtransport.Items.Clear();
             Omprotocol.Items.Clear();
 
-            // 【修改】直接用 SupportedProtocols 填充协议下拉框
-            foreach (var protocol in plugin.SupportedProtocols)
+            // ========== 协议下拉：统一用 GetProtocolOptions ==========
+            var protocolOptions = plugin.GetProtocolOptions()?.ToList();
+            if (protocolOptions != null && protocolOptions.Count > 0)
             {
-                Omprotocol.Items.Add(protocol);
-                Console.WriteLine($"[DEBUG] 型号 '{model}' 支持协议: {protocol}");
+                foreach (var (name, _) in protocolOptions)
+                {
+                    Omprotocol.Items.Add(name);
+                    Console.WriteLine($"[DEBUG] {model} 支持协议: {name}");
+                }
             }
-            foreach (var transport in plugin.SupportedTransports)
+            else
             {
-                Omtransport.Items.Add(transport);
-                Console.WriteLine($"[DEBUG] 型号 '{model}' 支持传输方式: {transport}");
+                Console.WriteLine($"[WARN] {model} GetProtocolOptions返回空");
             }
 
-            if (Omprotocol.Items.Count > 0)
+            // ========== 传输下拉：统一用 GetSupportedTransports(model) ==========
+            var transports = plugin.GetSupportedTransports(model)?.ToList() ?? new List<string>();
+
+            if (transports.Count > 0)
             {
-                Omprotocol.SelectedIndex = 0;
+                foreach (var t in transports)
+                {
+                    Omtransport.Items.Add(t);
+                    Console.WriteLine($"[DEBUG] {model} 支持传输: {t}");
+                }
             }
-            if (Omtransport.Items.Count > 0)
+            else
             {
-                Omtransport.SelectedIndex = 0;
+                Console.WriteLine($"[WARN] {model} GetSupportedTransports返回空");
             }
+
+            // ========== 默认选中 ==========
+            if (Omprotocol.Items.Count > 0) Omprotocol.SelectedIndex = 0;
+            if (Omtransport.Items.Count > 0) Omtransport.SelectedIndex = 0;
         }
+
+
+        /// <summary>
+        /// 从Omtransport下拉框获取选中的传输枚举
+        /// </summary>
+        /// <param name="transportType">输出枚举</param>
+        /// <returns>true成功，false失败</returns>
+        private bool TryGetSelectedTransport(out TransportType transportType)
+        {
+            transportType = default;
+            string? transStr = Omtransport.SelectedItem?.ToString();
+            if (string.IsNullOrWhiteSpace(transStr))
+            {
+                Console.WriteLine("[ERROR] 未选择传输方式");
+                return false;
+            }
+
+            if (!Enum.TryParse<TransportType>(transStr, ignoreCase: true, out transportType))
+            {
+                Console.WriteLine($"[ERROR] 无法解析传输方式字符串：{transStr}");
+                return false;
+            }
+            return true;
+        }
+
+
         private ITransport CreateTransport()
         {
             return Omtransport.SelectedItem?.ToString() switch
@@ -856,15 +1036,6 @@ namespace Free_spaceOpticalCirculatorTestApp
                 Global.opticalPowermeter = null;
                 MessageBox.Show("设备已断开连接", "信息");
                 connectButton.Enabled = true;
-
-                //_btnConnect.Enabled = true;
-                //_btnDisconnect.Enabled = false;
-                //_btnReadPower.Enabled = false;
-                //_btnSetWavelength.Enabled = false;
-                //_btnZero.Enabled = false;
-                //_txtWavelength.Enabled = false;
-                //_lblPower.Text = "-- dBm";
-                //_lblStatus.Text = "已断开";
             }
             catch (Exception ex)
             {
@@ -1344,6 +1515,10 @@ namespace Free_spaceOpticalCirculatorTestApp
                 if (ReferenceEquals(_currentDevice, device))
                 {
                     uiTextBox6.Text = power.ToString("F4");
+                    double readPower = power;
+                    double zeroValue = item.ZeroValueDbm;
+                    double IL = CalculateIL(readPower, zeroValue);
+                    uiTextBox8.Text = IL.ToString("F4");
                 }
 
             }
@@ -1356,6 +1531,13 @@ namespace Free_spaceOpticalCirculatorTestApp
                 if (ReferenceEquals(_currentDevice, device))
                     MessageBox.Show($"功率读取失败: {ex.Message}", "错误");
             }
+        }
+        private double CalculateIL(double readPower, double zeroValue)
+        {
+            double collimatorLoss = double.Parse(uiTextBox3.Text.Trim());
+            double IL = 0.0;
+            IL = comboBox1.Text.Trim().Equals("自由空间类") ? readPower - zeroValue - collimatorLoss : readPower - zeroValue;
+            return IL;
         }
 
         private async void uiButton13_Click(object sender, EventArgs e)
@@ -1415,6 +1597,10 @@ namespace Free_spaceOpticalCirculatorTestApp
                 if (ReferenceEquals(_currentDevice, device))
                 {
                     uiTextBox6.Text = power.ToString("F4");
+                    double readPower = power;
+                    double zeroValue = item.ZeroValueDbm;
+                    double IL = CalculateIL(readPower, zeroValue);
+                    uiTextBox8.Text = IL.ToString("F4");
                 }
 
             }
@@ -1432,6 +1618,80 @@ namespace Free_spaceOpticalCirculatorTestApp
         private void uiButton14_Click(object sender, EventArgs e)
         {
             rtb_Log.Clear();
+        }
+
+        private async void uiButton15_Click(object sender, EventArgs e)
+        {
+            var TestBoxSn = uiTextBox4.Text.Trim();
+            TestBoxZeroEntry entry = ZeroConfigManager.GetOrCreateBoxEntry(TestBoxSn);
+            List<ZeroCalibration> Items = entry.Items;
+            ZeroCalibration? item = Items.FirstOrDefault(x => x.TestItemName == "Tx-Rx(DIR)");
+            //查不到测试盒就提示 然后不再执行
+            if (item == null)
+            {
+                MessageBox.Show($"未找到测试盒 {TestBoxSn} 的归零项，请检查输入的测试盒序列号是否正确是否存在于Config/zero_calibration.json。", "提示", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+            //1.2 根据测试项内容，查询本地json文件，获取对应的开关状态数组；
+            List<String> switchList = item.SWStatus;
+            //1.3 根据开关状态数组，执行对应的开关操作；
+            //获取一下TestItemId，方便后续写入json文件
+            //便利开关操作
+            for (int i = 0; i < switchList.Count; i++)
+            {
+                if (switchList[i].Equals("0"))
+                {
+                    continue;
+                }
+                if (i < 3)
+                {
+                    //操作开关板1
+                    await _switchDevice.SwitchLightChannel(int.TryParse(switchList[i], out int channel) ? channel : 0);
+
+                }
+                else
+                {
+                    //操作开关板2
+                    if (switchList[i].Equals("1") || switchList[i].Equals("3"))
+                    {
+                        await _switchDevice2.SwitchLightChannel(2);
+                        Thread.Sleep(10); // 等待1秒，确保开关操作完成
+                    }
+                    await _switchDevice2.SwitchLightChannel(int.TryParse(switchList[i], out int channel) ? channel : 0);
+                }
+                await Task.Delay(10); // 等待10m秒，确保开关操作完成
+            }
+            await Task.Delay(300); // 等待0.3秒，确保开关操作完成
+            //1.4 读取功率计读数，得到归零值，更新日期和归零值大小到本地json文件，更新状态UI
+            //功率计通道暂时无法选择，手动修改配置表的命令可以选择读取的通道
+            var device = _currentDevice;
+            if (device == null || !device.IsConnected)
+            {
+                MessageBox.Show("请先连接功率计", "提示");
+                return;
+            }
+            try
+            {
+                var power = await device.ReadPowerAsync();
+                if (ReferenceEquals(_currentDevice, device))
+                {
+                    uiTextBox6.Text = power.ToString("F4");
+                    double readPower = power;
+                    double zeroValue = item.ZeroValueDbm;
+                    double IL = CalculateIL(readPower, zeroValue);
+                    uiTextBox8.Text = IL.ToString("F4");
+                }
+
+            }
+            catch (OperationCanceledException) when (!ReferenceEquals(_currentDevice, device))
+            {
+                // Disconnect canceled the pending read.
+            }
+            catch (Exception ex)
+            {
+                if (ReferenceEquals(_currentDevice, device))
+                    MessageBox.Show($"功率读取失败: {ex.Message}", "错误");
+            }
         }
     }
 }

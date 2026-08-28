@@ -4,6 +4,7 @@
   "Model": "JW8102",
   "Protocol": "SCPI",
   "DefaultTransport": "Serial",
+  "SupportedTransports": ["Serial"],
   "SerialSettings": {
     "BaudRate": 115200,
     "DataBits": 8,

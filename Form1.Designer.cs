@@ -86,6 +86,9 @@ namespace Free_spaceOpticalCirculatorTestApp
             uiPanel1 = new UIPanel();
             uiFlowLayoutPanel1 = new UIFlowLayoutPanel();
             uiCheckBoxGroup3 = new UICheckBoxGroup();
+            uiButton15 = new UIButton();
+            uiTextBox8 = new UITextBox();
+            uiLabel26 = new UILabel();
             uiButton13 = new UIButton();
             uiButton12 = new UIButton();
             uiLabel25 = new UILabel();
@@ -107,6 +110,7 @@ namespace Free_spaceOpticalCirculatorTestApp
             uiRadioButton13 = new UIRadioButton();
             uiRadioButton14 = new UIRadioButton();
             uiGroupBox2 = new UIGroupBox();
+            uiButton14 = new UIButton();
             uiLabel19 = new UILabel();
             rtb_Log = new UIRichTextBox();
             uiButton8 = new UIButton();
@@ -125,7 +129,6 @@ namespace Free_spaceOpticalCirculatorTestApp
             uiLight1 = new UILight();
             SwitchBaudrate = new UIComboBox();
             uiButton2 = new UIButton();
-            uiButton14 = new UIButton();
             uiGroupBox1.SuspendLayout();
             uiPanel3.SuspendLayout();
             uiFlowLayoutPanel3.SuspendLayout();
@@ -887,6 +890,9 @@ namespace Free_spaceOpticalCirculatorTestApp
             // 
             // uiCheckBoxGroup3
             // 
+            uiCheckBoxGroup3.Controls.Add(uiButton15);
+            uiCheckBoxGroup3.Controls.Add(uiTextBox8);
+            uiCheckBoxGroup3.Controls.Add(uiLabel26);
             uiCheckBoxGroup3.Controls.Add(uiButton13);
             uiCheckBoxGroup3.Controls.Add(uiButton12);
             uiCheckBoxGroup3.Controls.Add(uiLabel25);
@@ -920,10 +926,46 @@ namespace Free_spaceOpticalCirculatorTestApp
             uiCheckBoxGroup3.Text = "归零";
             uiCheckBoxGroup3.TextAlignment = ContentAlignment.MiddleLeft;
             // 
+            // uiButton15
+            // 
+            uiButton15.Font = new Font("宋体", 12F, FontStyle.Regular, GraphicsUnit.Point, 134);
+            uiButton15.Location = new Point(13, 592);
+            uiButton15.MinimumSize = new Size(1, 1);
+            uiButton15.Name = "uiButton15";
+            uiButton15.Size = new Size(100, 35);
+            uiButton15.TabIndex = 43;
+            uiButton15.Text = "Tx-Rx（DIR）";
+            uiButton15.TipsFont = new Font("宋体", 9F, FontStyle.Regular, GraphicsUnit.Point, 134);
+            uiButton15.Click += uiButton15_Click;
+            // 
+            // uiTextBox8
+            // 
+            uiTextBox8.Font = new Font("宋体", 12F, FontStyle.Regular, GraphicsUnit.Point, 134);
+            uiTextBox8.Location = new Point(168, 690);
+            uiTextBox8.Margin = new Padding(4, 5, 4, 5);
+            uiTextBox8.MinimumSize = new Size(1, 16);
+            uiTextBox8.Name = "uiTextBox8";
+            uiTextBox8.Padding = new Padding(5);
+            uiTextBox8.ShowText = false;
+            uiTextBox8.Size = new Size(186, 35);
+            uiTextBox8.TabIndex = 42;
+            uiTextBox8.TextAlignment = ContentAlignment.MiddleLeft;
+            uiTextBox8.Watermark = "";
+            // 
+            // uiLabel26
+            // 
+            uiLabel26.Font = new Font("宋体", 12F, FontStyle.Regular, GraphicsUnit.Point, 134);
+            uiLabel26.ForeColor = Color.FromArgb(48, 48, 48);
+            uiLabel26.Location = new Point(3, 690);
+            uiLabel26.Name = "uiLabel26";
+            uiLabel26.Size = new Size(150, 44);
+            uiLabel26.TabIndex = 41;
+            uiLabel26.Text = "计算值(db)";
+            // 
             // uiButton13
             // 
             uiButton13.Font = new Font("宋体", 12F, FontStyle.Regular, GraphicsUnit.Point, 134);
-            uiButton13.Location = new Point(204, 592);
+            uiButton13.Location = new Point(204, 553);
             uiButton13.MinimumSize = new Size(1, 1);
             uiButton13.Name = "uiButton13";
             uiButton13.Size = new Size(100, 35);
@@ -935,7 +977,7 @@ namespace Free_spaceOpticalCirculatorTestApp
             // uiButton12
             // 
             uiButton12.Font = new Font("宋体", 12F, FontStyle.Regular, GraphicsUnit.Point, 134);
-            uiButton12.Location = new Point(13, 590);
+            uiButton12.Location = new Point(13, 551);
             uiButton12.MinimumSize = new Size(1, 1);
             uiButton12.Name = "uiButton12";
             uiButton12.Size = new Size(100, 35);
@@ -948,7 +990,7 @@ namespace Free_spaceOpticalCirculatorTestApp
             // 
             uiLabel25.Font = new Font("宋体", 12F, FontStyle.Regular, GraphicsUnit.Point, 134);
             uiLabel25.ForeColor = Color.FromArgb(48, 48, 48);
-            uiLabel25.Location = new Point(13, 556);
+            uiLabel25.Location = new Point(13, 517);
             uiLabel25.Name = "uiLabel25";
             uiLabel25.Size = new Size(324, 31);
             uiLabel25.TabIndex = 38;
@@ -969,7 +1011,7 @@ namespace Free_spaceOpticalCirculatorTestApp
             // uiTextBox6
             // 
             uiTextBox6.Font = new Font("宋体", 12F, FontStyle.Regular, GraphicsUnit.Point, 134);
-            uiTextBox6.Location = new Point(175, 669);
+            uiTextBox6.Location = new Point(168, 638);
             uiTextBox6.Margin = new Padding(4, 5, 4, 5);
             uiTextBox6.MinimumSize = new Size(1, 16);
             uiTextBox6.Name = "uiTextBox6";
@@ -984,11 +1026,11 @@ namespace Free_spaceOpticalCirculatorTestApp
             // 
             uiLabel17.Font = new Font("宋体", 12F, FontStyle.Regular, GraphicsUnit.Point, 134);
             uiLabel17.ForeColor = Color.FromArgb(48, 48, 48);
-            uiLabel17.Location = new Point(13, 669);
+            uiLabel17.Location = new Point(3, 638);
             uiLabel17.Name = "uiLabel17";
-            uiLabel17.Size = new Size(150, 54);
+            uiLabel17.Size = new Size(150, 44);
             uiLabel17.TabIndex = 35;
-            uiLabel17.Text = "功率计返回结果(dbm)：（测试速度过快暂时不加）";
+            uiLabel17.Text = "功率计返回结果(dbm)：";
             // 
             // uiLabel16
             // 
@@ -1175,6 +1217,18 @@ namespace Free_spaceOpticalCirculatorTestApp
             uiGroupBox2.Text = "设备连接";
             uiGroupBox2.TextAlignment = ContentAlignment.MiddleLeft;
             uiGroupBox2.Click += uiGroupBox2_Click;
+            // 
+            // uiButton14
+            // 
+            uiButton14.Font = new Font("宋体", 12F, FontStyle.Regular, GraphicsUnit.Point, 134);
+            uiButton14.Location = new Point(250, 756);
+            uiButton14.MinimumSize = new Size(1, 1);
+            uiButton14.Name = "uiButton14";
+            uiButton14.Size = new Size(50, 26);
+            uiButton14.TabIndex = 42;
+            uiButton14.Text = "清空";
+            uiButton14.TipsFont = new Font("宋体", 9F, FontStyle.Regular, GraphicsUnit.Point, 134);
+            uiButton14.Click += uiButton14_Click;
             // 
             // uiLabel19
             // 
@@ -1420,18 +1474,6 @@ namespace Free_spaceOpticalCirculatorTestApp
             uiButton2.TipsFont = new Font("宋体", 9F, FontStyle.Regular, GraphicsUnit.Point, 134);
             uiButton2.Click += uiButton2_Click_1;
             // 
-            // uiButton14
-            // 
-            uiButton14.Font = new Font("宋体", 12F, FontStyle.Regular, GraphicsUnit.Point, 134);
-            uiButton14.Location = new Point(250, 756);
-            uiButton14.MinimumSize = new Size(1, 1);
-            uiButton14.Name = "uiButton14";
-            uiButton14.Size = new Size(50, 26);
-            uiButton14.TabIndex = 42;
-            uiButton14.Text = "清空";
-            uiButton14.TipsFont = new Font("宋体", 9F, FontStyle.Regular, GraphicsUnit.Point, 134);
-            uiButton14.Click += uiButton14_Click;
-            // 
             // Form1
             // 
             AutoScaleMode = AutoScaleMode.None;
@@ -1557,5 +1599,8 @@ namespace Free_spaceOpticalCirculatorTestApp
         private UIButton uiButton12;
         private UILabel uiLabel25;
         private UIButton uiButton14;
+        private UITextBox uiTextBox8;
+        private UILabel uiLabel26;
+        private UIButton uiButton15;
     }
 }

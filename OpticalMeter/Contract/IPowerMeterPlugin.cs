@@ -14,6 +14,10 @@ namespace OpticalMeter.Contract
         // ★ 新增：插件提供协议选项及对应的工厂方法
         IReadOnlyList<(string DisplayName, Func<IProtocol> Factory)> GetProtocolOptions();
 
+        // 在 IOpt PowerMeterPlugin 接口里加
+        IReadOnlyList<string> GetSupportedTransports(string model);
+
+
         IPowerMeter Create(ITransport transport, IProtocol protocol, Dictionary<string, string> config);
     }
 }

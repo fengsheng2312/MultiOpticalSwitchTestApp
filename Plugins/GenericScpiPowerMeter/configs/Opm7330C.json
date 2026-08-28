@@ -3,8 +3,9 @@
   "Vendor": "commpolar（严浩）",
   "Protocol": "SCPI",
   "DefaultTransport": "Serial",
+  "SupportedTransports": ["Serial"],
   "SerialSettings": {
-    "BaudRate": 115200,
+    "BaudRate": 9600,
     "DataBits": 8,
     "StopBits": "One",
     "Parity": "None",
@@ -12,7 +13,7 @@
   },
   "Commands": {
     "ReadPower": "READ{CH}:SCALar:POWer:DC?",
-    "SetWavelength": "SENS:POW:WAV {1310} nm",
+    "SetWavelength": "SENS:POW:WAV {waveLen} nm",
     "GetWavelength": "SENS:POW:WAV?",
     "Zero": "SENSe:CORRection:COLLect:ZERO:ALL",
     "GetIdn": "*IDN?"

@@ -3,6 +3,7 @@
   "Model": "N7744C",
   "Protocol": "SCPI",
   "DefaultTransport": "Serial",
+  "SupportedTransports": [ "Serial" ],
   "SerialSettings": {
     "BaudRate": 115200,
     "DataBits": 8,
