@@ -665,7 +665,7 @@ namespace Free_spaceOpticalCirculatorTestApp
                 await device.ConnectAsync(Omtransportparams.Text);
                 // Keep the existing behavior: perform the first power read after connecting.
                 // SerialTransport now cancels this read when the user disconnects.
-                await device.ReadPowerAsync();
+                //await device.ReadPowerAsync();
             }
             catch (Exception ex)
             {
@@ -695,6 +695,37 @@ namespace Free_spaceOpticalCirculatorTestApp
                 }
             }
 
+        }
+
+        private async void uiButton5_Click(object sender, EventArgs e)
+        {
+            var device = _currentDevice;
+            if (device == null || !device.IsConnected)
+            {
+                MessageBox.Show("请先连接功率计", "提示");
+                return;
+            }
+            try
+            {
+                var power = await device.ReadPowerAsync();
+                if (ReferenceEquals(_currentDevice, device))
+                {
+                    uiTextBox1.Text = power.ToString("F4");
+                }
+            }
+            catch (OperationCanceledException) when (!ReferenceEquals(_currentDevice, device))
+            {
+                // Disconnect canceled the pending read.
+            }
+            catch (Exception ex)
+            {
+                if (ReferenceEquals(_currentDevice, device))
+                    MessageBox.Show($"功率读取失败: {ex.Message}", "错误");
+            }
+            finally
+            {
+                uiButton5.Enabled = true;
+            }
         }
 
         private void uiGroupBox1_Click(object sender, EventArgs e)
@@ -1143,37 +1174,6 @@ namespace Free_spaceOpticalCirculatorTestApp
             // 更新外层盒子的LastUpdated
             entry.LastUpdated = DateTime.Now;
             ZeroConfigManager.UpdateItem(TestBoxSn, item);
-        }
-
-        private async void uiButton5_Click(object sender, EventArgs e)
-        {
-            var device = _currentDevice;
-            if (device == null || !device.IsConnected)
-            {
-                MessageBox.Show("请先连接功率计", "提示");
-                return;
-            }
-            try
-            {
-                var power = await device.ReadPowerAsync();
-                if (ReferenceEquals(_currentDevice, device))
-                {
-                    uiTextBox1.Text = power.ToString("F4");
-                }
-            }
-            catch (OperationCanceledException) when (!ReferenceEquals(_currentDevice, device))
-            {
-                // Disconnect canceled the pending read.
-            }
-            catch (Exception ex)
-            {
-                if (ReferenceEquals(_currentDevice, device))
-                    MessageBox.Show($"功率读取失败: {ex.Message}", "错误");
-            }
-            finally
-            {
-                uiButton5.Enabled = true;
-            }
         }
 
         private void uiButton1_Click_2(object sender, EventArgs e)

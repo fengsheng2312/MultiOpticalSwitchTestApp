@@ -11,7 +11,9 @@ namespace OpticalMeter.Transport
         // 实际项目中引入 HidSharp 或类似库
         // private HidDevice _device;
         // private HidStream _stream;
+        public byte[]? ResponseTerminator { get; set; }
 
+        public int ExpectedResponseLength { get; set; }
         public bool IsOpen => _isOpen;
 
         public Task OpenAsync(string connectionString, CancellationToken ct = default)

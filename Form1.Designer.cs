@@ -625,7 +625,7 @@ namespace Free_spaceOpticalCirculatorTestApp
             // uiButton11
             // 
             uiButton11.Font = new Font("宋体", 12F, FontStyle.Regular, GraphicsUnit.Point, 134);
-            uiButton11.Location = new Point(14, 639);
+            uiButton11.Location = new Point(14, 686);
             uiButton11.MinimumSize = new Size(1, 1);
             uiButton11.Name = "uiButton11";
             uiButton11.Size = new Size(100, 35);
@@ -934,7 +934,7 @@ namespace Free_spaceOpticalCirculatorTestApp
             uiButton15.Name = "uiButton15";
             uiButton15.Size = new Size(100, 35);
             uiButton15.TabIndex = 43;
-            uiButton15.Text = "Tx-Rx（DIR）";
+            uiButton15.Text = "Tx-Rx(DIR)";
             uiButton15.TipsFont = new Font("宋体", 9F, FontStyle.Regular, GraphicsUnit.Point, 134);
             uiButton15.Click += uiButton15_Click;
             // 

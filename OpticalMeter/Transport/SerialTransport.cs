@@ -10,6 +10,9 @@ namespace OpticalMeter.Transport
     {
         private readonly object _stateLock = new();
         private readonly SemaphoreSlim _lifecycleLock = new(1, 1);
+
+        public int ExpectedResponseLength { get; set; }
+
         private readonly SemaphoreSlim _ioLock = new(1, 1);
         private SerialPort? _port;
         private CancellationTokenSource? _connectionCts;

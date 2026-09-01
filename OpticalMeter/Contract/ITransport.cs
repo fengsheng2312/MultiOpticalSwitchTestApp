@@ -7,11 +7,14 @@ namespace OpticalMeter.Contract
     /// <summary>
     /// 传输层 —— 只负责原始字节的收发，不关心内容含义
     /// </summary>
+    
     public interface ITransport : IDisposable
     {
         /// <summary>是否已连接</summary>
         bool IsOpen { get; }
 
+        public int ExpectedResponseLength { get; set; }
+        public byte[]? ResponseTerminator { get; set; }
         /// <summary>打开连接</summary>
         Task OpenAsync(string connectionString, CancellationToken ct = default);
 

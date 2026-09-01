@@ -11,7 +11,12 @@ namespace OpticalMeter.Transport
         private TcpClient _client;
         private NetworkStream _stream;
 
+        byte[]? ResponseTerminator { get; set; }
+        public int ExpectedResponseLength { get; set; }
+
         public bool IsOpen => _client?.Connected ?? false;
+
+        byte[]? ITransport.ResponseTerminator { get => ResponseTerminator; set => ResponseTerminator = value; }
 
         public async Task OpenAsync(string connectionString, CancellationToken ct = default)
         {
