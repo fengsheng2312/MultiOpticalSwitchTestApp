@@ -20,6 +20,8 @@ namespace Free_spaceOpticalCirculatorTestApp
 {
     public partial class Form1 : UIForm
     {
+        private const string curVersion = "V1.8";
+        private const string modifytime = "2026-09-03";
         private readonly PluginManager _pluginManager = new();
         private IPowerMeter? _currentDevice;
         private bool _isRefreshingComPort = false;
@@ -32,6 +34,7 @@ namespace Free_spaceOpticalCirculatorTestApp
         public Form1()
         {
             InitializeComponent();
+            this.Text = $"环形器测试软件 {curVersion}";
             _switchDevice = new SwitchDevice();
             _switchDevice2 = new SwitchDevice();
             BindCombo(uiComboBox1);
@@ -150,6 +153,7 @@ namespace Free_spaceOpticalCirculatorTestApp
             {
                 SwitchBaudrate.SelectedIndex = 0;  // 代码可以写，属性面板看不见
             }
+            uiSymbolLabel1.Text = $"版本：{curVersion}\n\n修改时间：{modifytime}";
             _ = DoBindFixAsync();
         }
         private void SwitchDevice_OnDeviceFrameComplete(byte[] frameBytes)
@@ -662,7 +666,7 @@ namespace Free_spaceOpticalCirculatorTestApp
                 Global.opticalPowermeter = device;
                 Console.WriteLine($"[DEBUG] 创建设备实例: {device.GetType().FullName}+{protocol.GetType().Name}");
                 Console.WriteLine($"[DEBUG] 打开成功: {device.GetType().FullName}+{protocol.GetType().Name}");
-                await device.ConnectAsync(Omtransportparams.Text);
+                //await device.ConnectAsync(Omtransportparams.Text);
                 // Keep the existing behavior: perform the first power read after connecting.
                 // SerialTransport now cancels this read when the user disconnects.
                 //await device.ReadPowerAsync();
@@ -1692,6 +1696,11 @@ namespace Free_spaceOpticalCirculatorTestApp
                 if (ReferenceEquals(_currentDevice, device))
                     MessageBox.Show($"功率读取失败: {ex.Message}", "错误");
             }
+        }
+
+        private void uiToolTip1_Popup(object sender, PopupEventArgs e)
+        {
+
         }
     }
 }

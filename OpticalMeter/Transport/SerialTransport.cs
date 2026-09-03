@@ -339,6 +339,7 @@ namespace OpticalMeter.Transport
             await _ioLock.WaitAsync(ct).ConfigureAwait(false);
             try
             {
+                Console.WriteLine("Serial 发送中");
                 var operation = BeginOperation(ct);
                 using (operation.TokenSource)
                 {
@@ -367,6 +368,7 @@ namespace OpticalMeter.Transport
                         {
                             timeoutCts.CancelAfter(ReadTimeoutMs);
                             var buffer = new byte[bufferSize];
+                            Console.WriteLine("Serial 接收1");
                             try
                             {
                                 var len = await operation.Port.BaseStream.ReadAsync(
@@ -385,6 +387,7 @@ namespace OpticalMeter.Transport
                     // 配置了结束符 → 循环读取直到收到完整响应
                     using (var overallCts = CancellationTokenSource.CreateLinkedTokenSource(operation.TokenSource.Token))
                     {
+                        Console.WriteLine("Serial 接收2");
                         overallCts.CancelAfter(OverallReadTimeoutMs);
 
                         using (var ms = new MemoryStream())

@@ -110,6 +110,7 @@ namespace Free_spaceOpticalCirculatorTestApp
             uiRadioButton13 = new UIRadioButton();
             uiRadioButton14 = new UIRadioButton();
             uiGroupBox2 = new UIGroupBox();
+            uiSymbolLabel1 = new UISymbolLabel();
             uiButton14 = new UIButton();
             uiLabel19 = new UILabel();
             rtb_Log = new UIRichTextBox();
@@ -168,7 +169,7 @@ namespace Free_spaceOpticalCirculatorTestApp
             uiPanel3.MinimumSize = new Size(1, 1);
             uiPanel3.Name = "uiPanel3";
             uiPanel3.RectColor = Color.White;
-            uiPanel3.Size = new Size(281, 765);
+            uiPanel3.Size = new Size(281, 780);
             uiPanel3.TabIndex = 31;
             uiPanel3.Text = "uiPanel3";
             uiPanel3.TextAlignment = ContentAlignment.MiddleCenter;
@@ -183,7 +184,7 @@ namespace Free_spaceOpticalCirculatorTestApp
             uiFlowLayoutPanel3.Name = "uiFlowLayoutPanel3";
             uiFlowLayoutPanel3.Padding = new Padding(2);
             uiFlowLayoutPanel3.ShowText = false;
-            uiFlowLayoutPanel3.Size = new Size(283, 748);
+            uiFlowLayoutPanel3.Size = new Size(287, 760);
             uiFlowLayoutPanel3.TabIndex = 0;
             uiFlowLayoutPanel3.Text = "uiFlowLayoutPanel3";
             uiFlowLayoutPanel3.TextAlignment = ContentAlignment.MiddleCenter;
@@ -223,7 +224,7 @@ namespace Free_spaceOpticalCirculatorTestApp
             uiCheckBoxGroup1.Padding = new Padding(0, 32, 0, 0);
             uiCheckBoxGroup1.RectColor = Color.White;
             uiCheckBoxGroup1.SelectedIndexes = (List<int>)resources.GetObject("uiCheckBoxGroup1.SelectedIndexes");
-            uiCheckBoxGroup1.Size = new Size(271, 734);
+            uiCheckBoxGroup1.Size = new Size(281, 734);
             uiCheckBoxGroup1.TabIndex = 29;
             uiCheckBoxGroup1.Text = "功率计连接";
             uiCheckBoxGroup1.TextAlignment = ContentAlignment.MiddleLeft;
@@ -583,7 +584,7 @@ namespace Free_spaceOpticalCirculatorTestApp
             uiFlowLayoutPanel2.Padding = new Padding(2);
             uiFlowLayoutPanel2.RightToLeft = RightToLeft.No;
             uiFlowLayoutPanel2.ShowText = false;
-            uiFlowLayoutPanel2.Size = new Size(447, 748);
+            uiFlowLayoutPanel2.Size = new Size(447, 761);
             uiFlowLayoutPanel2.TabIndex = 0;
             uiFlowLayoutPanel2.Text = "测试";
             uiFlowLayoutPanel2.TextAlignment = ContentAlignment.MiddleLeft;
@@ -862,12 +863,12 @@ namespace Free_spaceOpticalCirculatorTestApp
             // 
             uiPanel1.Controls.Add(uiFlowLayoutPanel1);
             uiPanel1.Font = new Font("宋体", 12F, FontStyle.Regular, GraphicsUnit.Point, 134);
-            uiPanel1.Location = new Point(294, 31);
+            uiPanel1.Location = new Point(304, 31);
             uiPanel1.Margin = new Padding(4, 5, 4, 5);
             uiPanel1.MinimumSize = new Size(1, 1);
             uiPanel1.Name = "uiPanel1";
             uiPanel1.RectColor = Color.White;
-            uiPanel1.Size = new Size(442, 765);
+            uiPanel1.Size = new Size(432, 765);
             uiPanel1.TabIndex = 8;
             uiPanel1.Text = "uiPanel1";
             uiPanel1.TextAlignment = ContentAlignment.MiddleCenter;
@@ -883,7 +884,7 @@ namespace Free_spaceOpticalCirculatorTestApp
             uiFlowLayoutPanel1.Name = "uiFlowLayoutPanel1";
             uiFlowLayoutPanel1.Padding = new Padding(2);
             uiFlowLayoutPanel1.ShowText = false;
-            uiFlowLayoutPanel1.Size = new Size(425, 748);
+            uiFlowLayoutPanel1.Size = new Size(425, 760);
             uiFlowLayoutPanel1.TabIndex = 0;
             uiFlowLayoutPanel1.Text = "uiFlowLayoutPanel1";
             uiFlowLayoutPanel1.TextAlignment = ContentAlignment.MiddleCenter;
@@ -1187,6 +1188,7 @@ namespace Free_spaceOpticalCirculatorTestApp
             // 
             // uiGroupBox2
             // 
+            uiGroupBox2.Controls.Add(uiSymbolLabel1);
             uiGroupBox2.Controls.Add(uiButton14);
             uiGroupBox2.Controls.Add(uiLabel19);
             uiGroupBox2.Controls.Add(rtb_Log);
@@ -1217,6 +1219,18 @@ namespace Free_spaceOpticalCirculatorTestApp
             uiGroupBox2.Text = "设备连接";
             uiGroupBox2.TextAlignment = ContentAlignment.MiddleLeft;
             uiGroupBox2.Click += uiGroupBox2_Click;
+            // 
+            // uiSymbolLabel1
+            // 
+            uiSymbolLabel1.Anchor = AnchorStyles.Left;
+            uiSymbolLabel1.Font = new Font("楷体", 9F, FontStyle.Regular, GraphicsUnit.Point, 134);
+            uiSymbolLabel1.Location = new Point(145, 36);
+            uiSymbolLabel1.MinimumSize = new Size(1, 1);
+            uiSymbolLabel1.Name = "uiSymbolLabel1";
+            uiSymbolLabel1.Size = new Size(155, 35);
+            uiSymbolLabel1.Symbol = 62075;
+            uiSymbolLabel1.TabIndex = 43;
+            uiSymbolLabel1.Text = "版本信息";
             // 
             // uiButton14
             // 
@@ -1483,7 +1497,6 @@ namespace Free_spaceOpticalCirculatorTestApp
             Controls.Add(uiGroupBox1);
             Name = "Form1";
             RectColor = Color.White;
-            Text = "环形器测试软件";
             TitleColor = Color.DeepSkyBlue;
             ZoomScaleRect = new Rectangle(15, 15, 1552, 825);
             uiGroupBox1.ResumeLayout(false);
@@ -1602,5 +1615,6 @@ namespace Free_spaceOpticalCirculatorTestApp
         private UITextBox uiTextBox8;
         private UILabel uiLabel26;
         private UIButton uiButton15;
+        private UISymbolLabel uiSymbolLabel1;
     }
 }
