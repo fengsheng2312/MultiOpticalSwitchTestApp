@@ -169,7 +169,7 @@ namespace Free_spaceOpticalCirculatorTestApp
             uiPanel3.MinimumSize = new Size(1, 1);
             uiPanel3.Name = "uiPanel3";
             uiPanel3.RectColor = Color.White;
-            uiPanel3.Size = new Size(281, 780);
+            uiPanel3.Size = new Size(281, 765);
             uiPanel3.TabIndex = 31;
             uiPanel3.Text = "uiPanel3";
             uiPanel3.TextAlignment = ContentAlignment.MiddleCenter;
@@ -224,7 +224,7 @@ namespace Free_spaceOpticalCirculatorTestApp
             uiCheckBoxGroup1.Padding = new Padding(0, 32, 0, 0);
             uiCheckBoxGroup1.RectColor = Color.White;
             uiCheckBoxGroup1.SelectedIndexes = (List<int>)resources.GetObject("uiCheckBoxGroup1.SelectedIndexes");
-            uiCheckBoxGroup1.Size = new Size(281, 734);
+            uiCheckBoxGroup1.Size = new Size(267, 725);
             uiCheckBoxGroup1.TabIndex = 29;
             uiCheckBoxGroup1.Text = "功率计连接";
             uiCheckBoxGroup1.TextAlignment = ContentAlignment.MiddleLeft;
