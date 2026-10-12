@@ -4,7 +4,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace Free_spaceOpticalCirculatorTestApp.ComunicationTransport
+namespace MultiOpticalSwitchTestApp.ComunicationTransport
 {
     /// <summary>
     /// 异步串口封装类，兼容SCPI文本、GBK中文应答、二进制数据

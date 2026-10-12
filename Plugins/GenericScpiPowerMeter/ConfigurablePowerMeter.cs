@@ -1,4 +1,4 @@
-﻿using Free_spaceOpticalCirculatorTestApp;
+﻿using MultiOpticalSwitchTestApp;
 using OpticalMeter.Contract;
 using System;
 using System.Collections.Generic;

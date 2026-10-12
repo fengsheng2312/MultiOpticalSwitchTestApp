@@ -1,0 +1,177 @@
+{
+  "version": "2.0",
+  "description": "多光开关通道配置模板（按波长分组，共5个开关）",
+  "updated_at": "2026-10-12",
+  "wavelengths": {
+    "1310": {
+      "unit": "nm",
+      "switches": [
+        {
+          "id": 1,
+          "name": "SwitchA",
+          "channels": [
+            1,
+            2,
+            3,
+            4
+          ],
+          "core": [
+            "2",
+            12,
+            85,
+            96
+          ]
+        },
+        {
+          "id": 2,
+          "name": "SwitchB",
+          "channels": [
+            1,
+            2,
+            3,
+            4
+          ],
+          "core": [
+            1,
+            12,
+            85,
+            96
+          ]
+        },
+        {
+          "id": 3,
+          "name": "SwitchC",
+          "channels": [
+            1,
+            2,
+            3,
+            4
+          ],
+          "core": [
+            1,
+            12,
+            85,
+            96
+          ]
+        },
+        {
+          "id": 4,
+          "name": "SwitchD",
+          "channels": [
+            1,
+            2,
+            3,
+            4
+          ],
+          "core": [
+            1,
+            12,
+            85,
+            96
+          ]
+        },
+        {
+          "id": 5,
+          "name": "SwitchE",
+          "channels": [
+            1,
+            2,
+            3,
+            4
+          ],
+          "core": [
+            1,
+            12,
+            85,
+            96
+          ]
+        }
+      ]
+    },
+    "1550": {
+      "unit": "nm",
+      "switches": [
+        {
+          "id": 1,
+          "name": "SwitchA",
+          "channels": [
+            1,
+            2,
+            3,
+            4
+          ],
+          "core": [
+            1,
+            12,
+            85,
+            96
+          ]
+        },
+        {
+          "id": 2,
+          "name": "SwitchB",
+          "channels": [
+            1,
+            2,
+            3,
+            4
+          ],
+          "core": [
+            1,
+            12,
+            85,
+            96
+          ]
+        },
+        {
+          "id": 3,
+          "name": "SwitchC",
+          "channels": [
+            1,
+            2,
+            3,
+            4
+          ],
+          "core": [
+            1,
+            12,
+            85,
+            96
+          ]
+        },
+        {
+          "id": 4,
+          "name": "SwitchD",
+          "channels": [
+            1,
+            2,
+            3,
+            4
+          ],
+          "core": [
+            1,
+            12,
+            85,
+            96
+          ]
+        },
+        {
+          "id": 5,
+          "name": "SwitchE",
+          "channels": [
+            1,
+            2,
+            3,
+            4
+          ],
+          "core": [
+            1,
+            12,
+            85,
+            96
+          ]
+        }
+      ]
+    }
+  }
+}

@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 
-namespace Free_spaceOpticalCirculatorTestApp.DataModel.ZeroCalibration
+namespace MultiOpticalSwitchTestApp.DataModel.ZeroCalibration
 {
     /// <summary>
     /// 单条归零记录

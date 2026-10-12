@@ -3,7 +3,7 @@ using System.IO;
 using System.Collections.Generic;
 using System.Text;
 
-namespace Free_spaceOpticalCirculatorTestApp.FileOperation
+namespace MultiOpticalSwitchTestApp.FileOperation
 {
 
     /// <summary>

@@ -6,9 +6,9 @@ using System.Linq;
 using System.Reflection;
 using System.Collections;
 using System.Collections.Generic;
-using Free_spaceOpticalCirculatorTestApp.ComunicationTransport;
+using MultiOpticalSwitchTestApp.ComunicationTransport;
 
-namespace Free_spaceOpticalCirculatorTestApp
+namespace MultiOpticalSwitchTestApp
 {
     public static class Global
     {

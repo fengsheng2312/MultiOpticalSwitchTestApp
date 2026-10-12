@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Free_spaceOpticalCirculatorTestApp.Device
+namespace MultiOpticalSwitchTestApp.Device
 {
     /// <summary>所有SCPI串口设备基类</summary>
     public abstract class DeviceBase

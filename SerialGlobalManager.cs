@@ -1,11 +1,11 @@
-﻿using Free_spaceOpticalCirculatorTestApp.ComunicationTransport;
+﻿using MultiOpticalSwitchTestApp.ComunicationTransport;
 using System;
 using System.Collections.Generic;
 using System.IO.Ports;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Free_spaceOpticalCirculatorTestApp
+namespace MultiOpticalSwitchTestApp
 {
     /// <summary>
     /// 全局异步串口管理器，统一管理多路AsyncSerialPort实例，硬件层，只认COM端口

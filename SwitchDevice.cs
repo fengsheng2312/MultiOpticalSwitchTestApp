@@ -1,4 +1,4 @@
-﻿namespace Free_spaceOpticalCirculatorTestApp.Device
+﻿namespace MultiOpticalSwitchTestApp.Device
 {
     /// <summary>光开关业务设备，继承基类，后续可以扩展专属业务方法</summary>
     public class SwitchDevice : DeviceBase

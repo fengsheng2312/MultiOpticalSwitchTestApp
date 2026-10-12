@@ -1,7 +1,10 @@
-using Free_spaceOpticalCirculatorTestApp.DataModel;
-using Free_spaceOpticalCirculatorTestApp.DataModel.ZeroCalibration;
-using Free_spaceOpticalCirculatorTestApp.Device;
-using Free_spaceOpticalCirculatorTestApp.FileOperation;
+﻿using Microsoft.VisualBasic.Logging;
+using MultiOpticalSwitchTestApp.DataModel;
+using MultiOpticalSwitchTestApp.DataModel.ZeroCalibration;
+using MultiOpticalSwitchTestApp.Device;
+using MultiOpticalSwitchTestApp.FileOperation;
+using MultiOpticalSwitchTestApp.SoftwareUpdate;
+using MultiOpticalSwitchTestApp.Command;
 using OpticalMeter.Contract;
 using OpticalMeter.Host;
 using Plugins.GenericScpiPowerMeter;
@@ -10,18 +13,24 @@ using Sunny.UI.Win32;
 using System.Collections.Generic; 
 using System.IO.Ports;
 using System.Management;
+using System.Reflection;
 using System.Security.Cryptography.Xml;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
+using System.Text.RegularExpressions;
 using static System.ComponentModel.Design.ObjectSelectorEditor;
 using static System.Windows.Forms.VisualStyles.VisualStyleElement;
 
-namespace Free_spaceOpticalCirculatorTestApp
+namespace MultiOpticalSwitchTestApp
 {
     public partial class Form1 : UIForm
     {
-        private const string curVersion = "V1.8";
+        private bool _isUpdateChecking;
+        private const string curVersion = "V1.0.9";
         private const string modifytime = "2026-09-03";
+
+        private AutoUpdateService? _autoUpdate;
         private readonly PluginManager _pluginManager = new();
         private IPowerMeter? _currentDevice;
         private bool _isRefreshingComPort = false;
@@ -29,19 +38,56 @@ namespace Free_spaceOpticalCirculatorTestApp
         private UIComboBox _currentOpenCombo = null;
         private readonly SwitchDevice _switchDevice;
         private readonly SwitchDevice _switchDevice2;
+        // 光开关切通道指令生成器
+        private readonly command _switchCommand = new();
+        // 通道按钮只生成一次，避免重复加载
+        private bool _switchChannelButtonsBuilt;
         // 开关板原始接收缓存，用来拼接分片字节
+
+        //烧录初始化
+
+        // 全量轮询相关：取消源 + 结果窗体
+        private CancellationTokenSource? _pollCts;
+        private SwitchPollForm? _pollForm;
 
         public Form1()
         {
             InitializeComponent();
-            this.Text = $"环形器测试软件 {curVersion}";
+            LoadFormIcon();
+            this.Text = $"Core调节测试软件";
             _switchDevice = new SwitchDevice();
             _switchDevice2 = new SwitchDevice();
             BindCombo(uiComboBox1);
-            BindCombo(uiComboBox3);
+            BindCombo(switchCom);
+            checkAll.Click += CheckAll_Click;
             this.Load += Form1_Load;
-
         }
+        private void LoadFormIcon()
+        {
+            // 资源全名格式：RootNamespace.文件夹.文件名（RootNamespace 是 BurnWorker3，不是 BurnWorker）
+            string resName = "MultiOpticalSwitchTestApp.Assets.logo.ico";
+            var asm = Assembly.GetExecutingAssembly();
+            using var stream = asm.GetManifestResourceStream(resName);
+            if (stream == null)
+            {
+                // 把程序集里真实存在的嵌入资源名列出来，便于对照大小写与命名空间
+                string names = string.Join("\n", asm.GetManifestResourceNames());
+                MessageBox.Show($"资源未找到，名称：{resName}\n当前程序集嵌入资源：\n{names}");
+                return;
+            }
+            try
+            {
+                // 复制一份再赋值：Icon 需要自己持有数据，直接依赖会被 using 释放的流不可靠
+                using var tmp = new Icon(stream);
+                this.Icon = (Icon)tmp.Clone();
+            }
+            catch (Exception ex)
+            {
+                // 图标文件损坏或格式非法时只记录，绝不能让主窗体启动失败
+                Console.WriteLine($"图标加载失败：{ex.Message}");
+            }
+        }
+
         private async Task DoBindFixAsync()
         {
             await BindFixTextBoxFocusAsync(this);
@@ -125,7 +171,7 @@ namespace Free_spaceOpticalCirculatorTestApp
             // 界面加载完成、控件已经创建完毕，在这里刷新串口下拉框
             _ = RefreshAllSerialPortCombosAsync();
             await LoadPlugins();
-            var cbos = new UIComboBox[] { SwitchBaudrate, uiComboBox4 };
+            var cbos = new UIComboBox[] { SwitchBaudrate, baudrate };
             uiComboBox2.SelectedIndex = 0;
             foreach (var cbo in cbos)
             {
@@ -134,7 +180,6 @@ namespace Free_spaceOpticalCirculatorTestApp
                     cbo.SelectedIndex = 0;
                 }
             }
-            comboBox1.SelectedIndex = 0;
             // 订阅设备业务事件（IO后台线程，UI必须Invoke）
             // 订阅设备业务事件（IO后台线程，UI必须Invoke）
             _switchDevice.OnDataReceived += SwitchDevice_OnDataReceived;
@@ -153,8 +198,13 @@ namespace Free_spaceOpticalCirculatorTestApp
             {
                 SwitchBaudrate.SelectedIndex = 0;  // 代码可以写，属性面板看不见
             }
-            uiSymbolLabel1.Text = $"版本：{curVersion}\n\n修改时间：{modifytime}";
+            // 
+            uiSymbolLabel1.Text = $"版本：{Form1.AppVersion}\n时间：{Form1.BuildTime}";
+            Console.WriteLine($"版本：{Form1.AppVersion}\n\n修改时间：{Form1.BuildTime}");
+            BuildSwitchChannelButtons();
             _ = DoBindFixAsync();
+            // 启动后自动检查更新（静默模式：无更新/失败不打扰用户，仅写日志；发现新版本才弹窗）
+            //_ = CheckAndPromptUpdateAsync(silentWhenNoUpdate: true, silentOnError: true);
         }
         private void SwitchDevice_OnDeviceFrameComplete(byte[] frameBytes)
         {
@@ -204,8 +254,797 @@ namespace Free_spaceOpticalCirculatorTestApp
             rtb_Log.ScrollToCaret();
         }
 
+        /// <summary>
+        /// 读取 Config/SwitchCh.json 中 1310 波长的 switches 列表，
+        /// 每个开关对应一个 uiTableLayoutPanel，按 channels 生成通道按钮。
+        /// </summary>
+        private void BuildSwitchChannelButtons()
+        {
+            if (_switchChannelButtonsBuilt) return;
+
+            var panels = new UITableLayoutPanel[]
+            {
+                uiTableLayoutPanel1, uiTableLayoutPanel2, uiTableLayoutPanel3,
+                uiTableLayoutPanel4, uiTableLayoutPanel5
+            };
+
+            string configPath = Path.Combine(AppContext.BaseDirectory, "Config", "SwitchCh.json");
+            if (!File.Exists(configPath))
+            {
+                Console.WriteLine($"[SwitchCh] 配置文件不存在: {configPath}");
+                return;
+            }
+
+            var switches = new List<(int Id, string Name, List<int> Channels, List<string> Cores)>();
+            try
+            {
+                using JsonDocument doc = JsonDocument.Parse(File.ReadAllText(configPath));
+                if (!doc.RootElement.TryGetProperty("wavelengths", out JsonElement wavelengths) ||
+                    !wavelengths.TryGetProperty("1310", out JsonElement wl1310) ||
+                    !wl1310.TryGetProperty("switches", out JsonElement switchesArr))
+                {
+                    Console.WriteLine("[SwitchCh] 未找到 wavelengths.1310.switches 节点");
+                    return;
+                }
+
+                foreach (JsonElement sw in switchesArr.EnumerateArray())
+                {
+                    int id = sw.GetProperty("id").GetInt32();
+                    string name = sw.GetProperty("name").GetString() ?? $"Switch{id}";
+                    var channels = new List<int>();
+                    foreach (JsonElement ch in sw.GetProperty("channels").EnumerateArray())
+                    {
+                        channels.Add(ch.GetInt32());
+                    }
+                    // core 与 channels 一一对应，缺失时补空字符串
+                    var cores = new List<string>();
+                    if (sw.TryGetProperty("core", out JsonElement coreArr) && coreArr.ValueKind == JsonValueKind.Array)
+                    {
+                        foreach (JsonElement cv in coreArr.EnumerateArray())
+                        {
+                            cores.Add(cv.ValueKind == JsonValueKind.String ? cv.GetString() ?? "" : cv.ToString());
+                        }
+                    }
+                    while (cores.Count < channels.Count) cores.Add("");
+                    switches.Add((id, name, channels, cores));
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"读取 SwitchCh.json 失败：{ex.Message}", "错误",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+
+            int panelCount = Math.Min(panels.Length, switches.Count);
+            if (switches.Count != panels.Length)
+            {
+                Console.WriteLine($"[SwitchCh] 开关数({switches.Count})与面板数({panels.Length})不一致，仅生成前 {panelCount} 组");
+            }
+
+            for (int p = 0; p < panelCount; p++)
+            {
+                UITableLayoutPanel panel = panels[p];
+                (int id, string name, List<int> channels, List<string> cores) = switches[p];
+                panel.Controls.Clear();
+
+                // 列：Core编号标签 | 输入框 | 通道按钮 | 剩余填充
+                panel.ColumnCount = 4;
+                panel.ColumnStyles.Clear();
+                panel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 74F));
+                panel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 64F));
+                panel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 150F));
+                panel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
+
+                // 第0行开关名称，之后每个通道占一行
+                panel.RowCount = channels.Count + 1;
+                panel.RowStyles.Clear();
+                panel.RowStyles.Add(new RowStyle(SizeType.Absolute, 30F));
+                for (int r = 1; r < panel.RowCount; r++)
+                {
+                    panel.RowStyles.Add(new RowStyle(SizeType.Percent, 100F / channels.Count));
+                }
+
+                var nameLabel = new UILabel
+                {
+                    Text = name,
+                    Dock = DockStyle.Fill,
+                    Margin = new Padding(6, 2, 6, 0),
+                    TextAlign = ContentAlignment.MiddleLeft,
+                    BackColor = Color.Transparent,
+                    ForeColor = Color.FromArgb(48, 48, 48),
+                    Font = new Font("宋体", 11F, FontStyle.Bold),
+                };
+                panel.Controls.Add(nameLabel);
+                panel.SetCellPosition(nameLabel, new TableLayoutPanelCellPosition(0, 0));
+                panel.SetColumnSpan(nameLabel, 4);
+
+                for (int c = 0; c < channels.Count; c++)
+                {
+                    int channel = channels[c];
+                    int row = c + 1;
+
+                    var coreLabel = new UILabel
+                    {
+                        Text = "Core编号:",
+                        Dock = DockStyle.Fill,
+                        Margin = new Padding(6, 0, 0, 0),
+                        TextAlign = ContentAlignment.MiddleLeft,
+                        BackColor = Color.Transparent,
+                        ForeColor = Color.FromArgb(48, 48, 48),
+                        Font = new Font("宋体", 9F)
+
+                    };
+                    panel.Controls.Add(coreLabel);
+                    panel.SetCellPosition(coreLabel, new TableLayoutPanelCellPosition(0, row));
+
+                    var coreTextBox = new UITextBox
+                    {
+                        Name = $"coreTextBox_{id}_{channel}",
+                        Dock = DockStyle.Fill,
+                        Margin = new Padding(2, 7, 4, 7),
+                        Text = c < cores.Count ? cores[c] : string.Empty,
+                    };
+                    panel.Controls.Add(coreTextBox);
+                    panel.SetCellPosition(coreTextBox, new TableLayoutPanelCellPosition(1, row));
+
+                    var btn = new UIButton
+                    {
+                        Text = $"通道:{channel}",
+                        Dock = DockStyle.Fill,
+                        Margin = new Padding(4, 6, 8, 6),
+                        Font = new Font("宋体", 10F),
+                    };
+                    btn.Tag = (id, channel, name, panel);
+                    SetSwitchButtonSelected(btn, false);
+                    btn.Click += SwitchChannelButton_Click;
+
+                    panel.Controls.Add(btn);
+                    panel.SetCellPosition(btn, new TableLayoutPanelCellPosition(2, row));
+                }
+            }
+
+            _switchChannelButtonsBuilt = true;
+            Console.WriteLine($"[SwitchCh] 已生成 {panelCount} 组通道按钮");
+        }
+
+        /// <summary>通道按钮点击：同组内互斥高亮，并向开关板下发切通道指令。</summary>
+        private async void SwitchChannelButton_Click(object sender, EventArgs e)
+        {
+            if (sender is not UIButton btn) return;
+            if (btn.Tag is not (int id, int channel, string switchName, UITableLayoutPanel panel)) return;
+
+            // 点击即保存：若左侧 Core 输入框有值，同步刷新 SwitchCh.json 与 zeroDiff.json
+            SaveCoreIfFilled(panel, id, channel, switchName);
+
+            if (!_switchDevice.IsOpened)
+            {
+                MessageBox.Show("开关串口未打开，请先打开串口后再切换通道！", "提示",
+                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            try
+            {
+                byte[] frame = _switchCommand.SwitchLightChannel(id, channel);
+                // 收发内容已由 SerialGlobalManager 的日志事件统一输出到 rtb_Log
+                await _switchDevice.WriteBytesAsync(frame);
+
+                // 指令发送成功后：同一个 uiTableLayoutPanel 下当前按钮变黑，其余恢复白色
+                foreach (Control ctrl in panel.Controls)
+                {
+                    if (ctrl is UIButton other)
+                    {
+                        SetSwitchButtonSelected(other, ReferenceEquals(other, btn));
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"切换通道失败：{ex.Message}", "错误",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        /// <summary>
+        /// 读取按钮同行的 Core 输入框，非空时把值写回
+        /// Config/SwitchCh.json 的 switches[].core[channels下标]，
+        /// 并把 Config/zeroDiff.json 中同 switch_name+channel 的条目 core 全部刷新。
+        /// </summary>
+        private static void SaveCoreIfFilled(UITableLayoutPanel panel, int id, int channel, string switchName)
+        {
+            var box = panel.Controls.Find($"coreTextBox_{id}_{channel}", false)
+                           .OfType<UITextBox>().FirstOrDefault();
+            string coreValue = box?.Text?.Trim() ?? string.Empty;
+            if (coreValue.Length == 0) return;
+
+            foreach (string configDir in GetConfigWriteDirs())
+            {
+                string switchChPath = Path.Combine(configDir, "SwitchCh.json");
+                string zeroDiffPath = Path.Combine(configDir, "zeroDiff.json");
+                try
+                {
+                    bool changed = false;
+                    if (File.Exists(switchChPath))
+                    {
+                        var root = JsonNode.Parse(File.ReadAllText(switchChPath));
+                        var switches = root?["wavelengths"]?["1310"]?["switches"]?.AsArray();
+                        if (switches != null)
+                        {
+                            foreach (var node in switches)
+                            {
+                                if (node is null || NodeInt(node["id"]) != id) continue;
+                                var chArr = node["channels"]?.AsArray();
+                                int idx = -1;
+                                for (int i = 0; i < (chArr?.Count ?? 0); i++)
+                                {
+                                    if (NodeInt(chArr[i]) == channel) { idx = i; break; }
+                                }
+                                if (idx < 0) break;
+
+                                var coreArr = node["core"]?.AsArray();
+                                if (coreArr == null)
+                                {
+                                    coreArr = new JsonArray();
+                                    node["core"] = coreArr;
+                                }
+                                while (coreArr.Count <= idx) coreArr.Add((string?)null);
+                                if (CoreText(coreArr[idx]) != coreValue)
+                                {
+                                    coreArr[idx] = coreValue;
+                                    changed = true;
+                                }
+                                break;
+                            }
+                        }
+                        if (changed)
+                        {
+                            root!["updated_at"] = DateTime.Now.ToString("yyyy-MM-dd");
+                            File.WriteAllText(switchChPath, root.ToJsonString(JsonConfigWriteOptions));
+                            Console.WriteLine($"[SwitchCh] 已更新 {switchChPath}：Switch{id} 通道{channel} core={coreValue}");
+                        }
+                    }
+
+                    if (File.Exists(zeroDiffPath))
+                    {
+                        var zroot = JsonNode.Parse(File.ReadAllText(zeroDiffPath));
+                        var zeroDiff = zroot?["wavelengths"]?["1310"]?["zero_diff"]?.AsObject();
+                        int updated = 0;
+                        if (zeroDiff != null)
+                        {
+                            foreach (var kv in zeroDiff)
+                            {
+                                var entry = kv.Value;
+                                if (entry is null) continue;
+                                if (CoreText(entry["switch_name"]) == switchName &&
+                                    NodeInt(entry["channel"]) == channel &&
+                                    CoreText(entry["core"]) != coreValue)
+                                {
+                                    entry["core"] = coreValue;
+                                    updated++;
+                                }
+                            }
+                        }
+                        if (updated > 0)
+                        {
+                            zroot!["updated_at"] = DateTime.Now.ToString("yyyy-MM-dd");
+                            File.WriteAllText(zeroDiffPath, zroot.ToJsonString(JsonConfigWriteOptions));
+                            Console.WriteLine($"[zeroDiff] 已更新 {zeroDiffPath}：{switchName} 通道{channel} 共{updated}条 core={coreValue}");
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"写入配置文件失败（{configDir}）：{ex.Message}", "错误",
+                        MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
+            }
+        }
+
+        /// <summary>中文不转义、缩进输出的 JSON 写回选项。</summary>
+        private static readonly JsonSerializerOptions JsonConfigWriteOptions = new()
+        {
+            WriteIndented = true,
+            Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+        };
+
+        /// <summary>
+        /// 配置写回目录：运行时 BaseDirectory\Config，
+        /// 以及源码工程目录\Config（能定位到时，防止下次构建用源码副本覆盖运行时改动）。
+        /// </summary>
+        private static IEnumerable<string> GetConfigWriteDirs()
+        {
+            yield return Path.Combine(AppContext.BaseDirectory, "Config");
+
+            // 迭代器不能在 try(含catch) 中 yield，先定位再返回
+            string? srcConfig = null;
+            try
+            {
+                var dir = new DirectoryInfo(AppContext.BaseDirectory);
+                while (dir != null)
+                {
+                    var csproj = dir.GetFiles("*.csproj").FirstOrDefault();
+                    if (csproj != null)
+                    {
+                        string src = Path.Combine(dir.FullName, "Config");
+                        if (Directory.Exists(src) &&
+                            !string.Equals(src, Path.Combine(AppContext.BaseDirectory, "Config"),
+                                StringComparison.OrdinalIgnoreCase))
+                        {
+                            srcConfig = src;
+                        }
+                        break;
+                    }
+                    dir = dir.Parent;
+                }
+            }
+            catch
+            {
+                // 定位源码目录失败时只写运行时目录
+            }
+
+            if (srcConfig != null) yield return srcConfig;
+        }
+
+        /// <summary>取 JSON 节点文本（兼容 null/数字），不可读时返回空串。</summary>
+        private static string CoreText(JsonNode? node)
+        {
+            if (node is null) return string.Empty;
+            return node.GetValueKind() == JsonValueKind.Null ? string.Empty : node.ToString();
+        }
+
+        /// <summary>取 JSON 节点整数值（兼容数字/字符串数字），无法解析时返回 -1。</summary>
+        private static int NodeInt(JsonNode? node)
+        {
+            if (node is null) return -1;
+            try
+            {
+                var kind = node.GetValueKind();
+                if (kind is JsonValueKind.Number or JsonValueKind.String)
+                {
+                    string s = node.ToString();
+                    return int.TryParse(s, out int p) ? p : -1;
+                }
+            }
+            catch
+            {
+                // 类型不符时走默认返回
+            }
+            return -1;
+        }
+
+        /// <summary>
+        /// 设置通道按钮外观。
+        /// 选中=黑底白字；未选中=白底黑字，悬停/按下时按钮底色变灰、字体颜色保持不变。
+        /// StyleCustomMode 必须开启，否则 SunnyUI 会按默认 Style 在悬停时把文字重绘成白色。
+        /// </summary>
+        private static void SetSwitchButtonSelected(UIButton btn, bool selected)
+        {
+            btn.StyleCustomMode = true;
+            if (selected)
+            {
+                btn.FillColor = Color.Black;
+                btn.FillHoverColor = Color.FromArgb(60, 60, 60);
+                btn.FillPressColor = Color.FromArgb(40, 40, 40);
+                btn.RectColor = Color.FromArgb(48, 48, 48);
+                btn.RectHoverColor = Color.FromArgb(48, 48, 48);
+                btn.RectPressColor = Color.FromArgb(48, 48, 48);
+                btn.ForeColor = Color.White;
+                btn.ForeHoverColor = Color.White;
+                btn.ForePressColor = Color.White;
+            }
+            else
+            {
+                btn.FillColor = Color.White;
+                btn.FillHoverColor = Color.FromArgb(224, 224, 224);
+                btn.FillPressColor = Color.FromArgb(200, 200, 200);
+                btn.RectColor = Color.FromArgb(220, 220, 220);
+                btn.RectHoverColor = Color.FromArgb(190, 190, 190);
+                btn.RectPressColor = Color.FromArgb(190, 190, 190);
+                btn.ForeColor = Color.FromArgb(48, 48, 48);
+                btn.ForeHoverColor = Color.FromArgb(48, 48, 48);
+                btn.ForePressColor = Color.FromArgb(48, 48, 48);
+            }
+        }
+
+        #region 全量轮询测试（checkAll 开表，表内“开始/停止轮询”驱动）
+
+        // 当前轮询会话：波长、表格数据、开关名→id、光源序号→json 里生效的归零值
+        private string _pollWaveLen = "1310";
+        private List<SwitchPollForm.PollItem> _pollItems = new();
+        private readonly Dictionary<string, int> _pollNameToId = new(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<string, double> _pollJsonZeroValues = new(StringComparer.OrdinalIgnoreCase);
+
+        /// <summary>
+        /// 解析轮询序号输入（如 1~15/1/1,2,3/1，2，3）为序号集合。
+        /// 支持范围写法（a~b / a-b，顺序可颠倒）与单个数字，
+        /// 分隔符 / \ , ， ; ； 空格 换行 均可；未填写或格式非法返回 null 由调用方提示。
+        /// </summary>
+        private static HashSet<int>? ParseCheckListNumbers(string input)
+        {
+            if (string.IsNullOrWhiteSpace(input)) return null;
+
+            const int MaxSpan = 512;
+            var result = new HashSet<int>();
+            string[] tokens = input.Split(
+                new[] { '/', '\\', ',', '，', ';', '；', ' ', '\t', '\r', '\n' },
+                StringSplitOptions.RemoveEmptyEntries);
+
+            foreach (string raw in tokens)
+            {
+                string tk = raw.Trim();
+                if (tk.Length == 0) continue;
+
+                int sep = FirstRangeSeparator(tk);
+                if (sep > 0)
+                {
+                    if (!int.TryParse(tk.Substring(0, sep), out int lo) ||
+                        !int.TryParse(tk.Substring(sep + 1), out int hi))
+                        return null;
+                    if (lo <= 0 || hi <= 0) return null;
+                    if (lo > hi) (lo, hi) = (hi, lo);
+                    if (hi - lo + 1 > MaxSpan) return null;
+                    for (int v = lo; v <= hi; v++) result.Add(v);
+                }
+                else
+                {
+                    if (!int.TryParse(tk, out int n) || n <= 0) return null;
+                    result.Add(n);
+                }
+            }
+
+            return result.Count == 0 ? null : result;
+        }
+
+        /// <summary>返回序号范围分隔符（~ ～ - — –）最早出现的位置，不存在返回 -1。</summary>
+        private static int FirstRangeSeparator(string text)
+        {
+            // 半角波浪号/全角波浪号/连字符/破折号/短破折号
+            const string seps = "\u007E\uFF5E\u002D\u2014\u2013";
+            for (int i = 0; i < text.Length; i++)
+            {
+                if (seps.IndexOf(text[i]) >= 0) return i;
+            }
+            return -1;
+        }
+
+        /// <summary>
+        /// checkAll：按 waveLenText 波长读取 Config/zeroDiff.json 的 zero_diff，
+        /// 只弹出数据表窗体；开关切换与读数由表内“开始轮询”按钮触发，打开时不自动执行。
+        /// </summary>
+        private void CheckAll_Click(object sender, EventArgs e)
+        {
+            string waveLen = waveLenText.Text.Trim();
+            if (string.IsNullOrEmpty(waveLen))
+            {
+                MessageBox.Show("请先在波长输入框中填写波长（如 1310），再点击全量轮询。", "提示",
+                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            // 轮询序号过滤：依据 checkList.Text 生成序号集合，未命中的 zero_diff 条目不生成表格行
+            HashSet<int>? wantNos = ParseCheckListNumbers(checkList.Text);
+            if (wantNos == null)
+            {
+                MessageBox.Show("请先填写轮询序号，支持：单个数字(1,2,3)、范围(1~15)、混合(1~8/10,12)，分隔符 / 或 , 均可。", "提示",
+                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            string configDir = Path.Combine(AppContext.BaseDirectory, "Config");
+            string zeroDiffPath = Path.Combine(configDir, "zeroDiff.json");
+            string switchChPath = Path.Combine(configDir, "SwitchCh.json");
+            if (!File.Exists(zeroDiffPath) || !File.Exists(switchChPath))
+            {
+                MessageBox.Show($"缺少配置文件：{zeroDiffPath} 或 {switchChPath}", "错误",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+
+            var items = new List<SwitchPollForm.PollItem>();
+            var nameToId = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            var jsonZero = new Dictionary<string, double>(StringComparer.OrdinalIgnoreCase);
+            try
+            {
+                // 开关名 → id 映射（切换指令需要 id）
+                var swRoot = JsonNode.Parse(File.ReadAllText(switchChPath));
+                var swArr = swRoot?["wavelengths"]?[waveLen]?["switches"]?.AsArray();
+                if (swArr == null)
+                {
+                    MessageBox.Show($"SwitchCh.json 中未找到 wavelengths.{waveLen}.switches 节点", "错误",
+                        MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    return;
+                }
+                foreach (var node in swArr)
+                {
+                    if (node is null) continue;
+                    nameToId[CoreText(node["name"])] = NodeInt(node["id"]);
+                }
+
+                // zero_diff 逐条读取，按光源序号排序
+                var zRoot = JsonNode.Parse(File.ReadAllText(zeroDiffPath));
+                if (zRoot?["wavelengths"]?[waveLen]?["zero_diff"] is not JsonObject zeroDiffObj)
+                {
+                    MessageBox.Show($"zeroDiff.json 中未找到 wavelengths.{waveLen}.zero_diff 节点", "错误",
+                        MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    return;
+                }
+                var ordered = new List<KeyValuePair<string, JsonNode?>>(zeroDiffObj);
+                ordered.Sort((a, b) =>
+                {
+                    int na = int.TryParse(a.Key, out int x) ? x : int.MaxValue;
+                    int nb = int.TryParse(b.Key, out int y) ? y : int.MaxValue;
+                    return na.CompareTo(nb);
+                });
+                foreach (var kv in ordered)
+                {
+                    var entry = kv.Value;
+                    if (entry is null) continue;
+
+                    // 序号不在 checkList 生成的序列里 → 该条目不进表格
+                    if (wantNos != null && (!int.TryParse(kv.Key, out int no) || !wantNos.Contains(no)))
+                        continue;
+
+                    double zero = NodeDouble(entry["zero_value"]);
+                    items.Add(new SwitchPollForm.PollItem(
+                        kv.Key,
+                        zero,
+                        CoreText(entry["core"]),
+                        CoreText(entry["switch_name"]),
+                        NodeInt(entry["channel"])));
+                    jsonZero[kv.Key] = zero;
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"读取配置失败：{ex.Message}", "错误",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+
+            if (items.Count == 0)
+            {
+                MessageBox.Show($"按轮询序号「{checkList.Text.Trim()}」过滤后，wavelengths.{waveLen}.zero_diff 没有可显示的数据。", "提示",
+                    MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            // 已有表格时先停掉上一轮并关闭，保证窗口与会话数据一一对应
+            if (_pollForm is { IsDisposed: false })
+            {
+                StopPolling();
+                _pollForm.Close();
+            }
+
+            _pollWaveLen = waveLen;
+            _pollItems = items;
+            _pollNameToId.Clear();
+            foreach (var kv in nameToId) _pollNameToId[kv.Key] = kv.Value;
+            _pollJsonZeroValues.Clear();
+            foreach (var kv in jsonZero) _pollJsonZeroValues[kv.Key] = kv.Value;
+
+            var form = new SwitchPollForm(waveLen, items);
+            form.StartRequested += PollStartRequested;
+            form.StopRequested += (_, _) => StopPolling();
+            form.FormClosed += (_, _) => StopPolling();
+            _pollForm = form;
+            form.Show(this);
+        }
+
+        /// <summary>表内“开始轮询”：校验串口与功率计后启动后台线程，打开时不自动执行。</summary>
+        private void PollStartRequested(object? sender, EventArgs e)
+        {
+            if (_pollCts != null) return;
+
+            var form = _pollForm;
+            if (!_switchDevice.IsOpened)
+            {
+                MessageBox.Show("开关串口未打开，请先打开串口后再启动轮询！", "提示",
+                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                form?.SetRunning(false);
+                return;
+            }
+
+            var device = _currentDevice;
+            if (device == null || !device.IsConnected)
+            {
+                MessageBox.Show("请先连接功率计再启动轮询！", "提示",
+                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                form?.SetRunning(false);
+                return;
+            }
+
+            if (_pollItems.Count == 0)
+            {
+                MessageBox.Show("没有可轮询的数据，请重新点击“全量轮询”。", "提示",
+                    MessageBoxButtons.OK, MessageBoxIcon.Information);
+                form?.SetRunning(false);
+                return;
+            }
+
+            var cts = new CancellationTokenSource();
+            _pollCts = cts;
+            form?.SetRunning(true);
+            _ = Task.Run(() => RunPollLoopAsync(cts.Token));
+        }
+
+        /// <summary>主界面 stopAll：取消后台轮询线程，表格保留最后一次的数值。</summary>
+        private void StopAll_Click(object sender, EventArgs e)
+        {
+            if (_pollCts == null)
+            {
+                MessageBox.Show("当前没有正在运行的轮询。", "提示",
+                    MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+            StopPolling();
+        }
+
+        /// <summary>停止并清理轮询取消源（幂等），同时复位表内按钮状态。</summary>
+        private void StopPolling()
+        {
+            var cts = _pollCts;
+            _pollCts = null;
+            if (cts == null) return;
+            cts.Cancel();
+            cts.Dispose();
+            _pollForm?.SetRunning(false);
+        }
+
+        /// <summary>
+        /// 后台轮询：逐条切开关→读功率→刷新表格，一轮完成再下一轮；
+        /// 每轮把表格里的归零值与 zeroDiff.json 比对，不一致则写回配置文件。
+        /// </summary>
+        private async Task RunPollLoopAsync(CancellationToken token)
+        {
+            var form = _pollForm;
+            var items = _pollItems;
+            try
+            {
+                while (!token.IsCancellationRequested)
+                {
+                    foreach (var it in items)
+                    {
+                        token.ThrowIfCancellationRequested();
+
+                        if (!_pollNameToId.TryGetValue(it.SwitchName, out int switchId))
+                            throw new InvalidOperationException($"SwitchCh.json 中未找到开关 {it.SwitchName}");
+
+                        var device = _currentDevice;
+                        if (device == null || !device.IsConnected)
+                            throw new InvalidOperationException("功率计已断开，轮询停止");
+
+                        if (!_switchDevice.IsOpened)
+                            throw new InvalidOperationException("开关串口已离线，轮询停止");
+
+                        // 归零值以表格当前内容为准（用户可手工修改）
+                        double zeroValue = form?.GetZeroValue(it.LightNo) ?? it.ZeroValue;
+
+                        // 与通道按钮同一套指令与串口链路
+                        byte[] frame = _switchCommand.SwitchLightChannel(switchId, it.Channel);
+                        await _switchDevice.WriteBytesAsync(frame);
+                        await Task.Delay(120, token); // 等待光路切换稳定
+
+                        double power = await device.ReadPowerAsync();
+                        double actual = power + zeroValue;
+                        form?.UpdateResult(it.LightNo, power.ToString("F4"), actual.ToString("F4"));
+
+                        // 检测到与 json 中的归零值不一致时写回
+                        if (ZeroDiffers(zeroValue, JsonZeroOf(it.LightNo)))
+                        {
+                            SaveZeroValueToConfig(_pollWaveLen, it.LightNo, zeroValue);
+                        }
+                    }
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                // 正常停止
+            }
+            catch (Exception ex)
+            {
+                string msg = ex.Message;
+                try
+                {
+                    BeginInvoke(new Action(() =>
+                    {
+                        StopPolling();
+                        MessageBox.Show($"轮询已停止：{msg}", "错误",
+                            MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    }));
+                }
+                catch
+                {
+                    // 窗体已关闭，忽略
+                }
+            }
+            finally
+            {
+                form?.SetRunning(false);
+            }
+        }
+
+        /// <summary>当前会话中某光源在 zeroDiff.json 里的归零值基线。</summary>
+        private double JsonZeroOf(string lightNo)
+        {
+            return _pollJsonZeroValues.TryGetValue(lightNo, out double v) ? v : 0.0;
+        }
+
+        /// <summary>
+        /// 归零值差异判定：表格按 4 位小数显示，因此两边都按 4 位小数比较，
+        /// 避免因显示精度造成“没改却写回”的误判。
+        /// </summary>
+        private static bool ZeroDiffers(double a, double b)
+        {
+            return Math.Abs(Math.Round(a, 4) - Math.Round(b, 4)) >= 0.00005;
+        }
+
+        /// <summary>把表格中的归零值写回 Config/zeroDiff.json（运行时目录与源码目录同步）。</summary>
+        private void SaveZeroValueToConfig(string waveLen, string lightNo, double value)
+        {
+            foreach (string configDir in GetConfigWriteDirs())
+            {
+                string zeroDiffPath = Path.Combine(configDir, "zeroDiff.json");
+                if (!File.Exists(zeroDiffPath)) continue;
+                try
+                {
+                    var root = JsonNode.Parse(File.ReadAllText(zeroDiffPath));
+                    if (root?["wavelengths"]?[waveLen]?["zero_diff"] is not JsonObject zeroDiffObj) continue;
+                    if (zeroDiffObj[lightNo] is not JsonObject entry) continue;
+
+                    double current = NodeDouble(entry["zero_value"]);
+                    if (!ZeroDiffers(value, current)) continue;
+
+                    entry["zero_value"] = Math.Round(value, 4);
+                    root["updated_at"] = DateTime.Now.ToString("yyyy-MM-dd");
+                    File.WriteAllText(zeroDiffPath, root.ToJsonString(JsonConfigWriteOptions));
+                    Console.WriteLine($"[zeroDiff] 已更新 {zeroDiffPath}：光源{lightNo} zero_value={Math.Round(value, 4)}");
+                }
+                catch (Exception ex)
+                {
+                    string msg = ex.Message;
+                    string dir = configDir;
+                    try
+                    {
+                        BeginInvoke(new Action(() =>
+                            MessageBox.Show($"写入 zeroDiff.json 失败（{dir}）：{msg}", "错误",
+                                MessageBoxButtons.OK, MessageBoxIcon.Error)));
+                    }
+                    catch
+                    {
+                        // 窗体已关闭，忽略
+                    }
+                }
+            }
+
+            // 基线更新，避免下一轮重复写同一个值
+            _pollJsonZeroValues[lightNo] = Math.Round(value, 4);
+        }
+
+        /// <summary>取 JSON 节点小数值（兼容数字/字符串），无法解析时返回 0。</summary>
+        private static double NodeDouble(JsonNode? node)
+        {
+            if (node is null) return 0.0;
+            try
+            {
+                var kind = node.GetValueKind();
+                if (kind == JsonValueKind.Number) return node.GetValue<double>();
+                if (kind == JsonValueKind.String)
+                    return double.TryParse(node.ToString(), out double d) ? d : 0.0;
+            }
+            catch
+            {
+                // 类型不符时走默认返回
+            }
+            return 0.0;
+        }
+
+        #endregion
+
         private void Form1_FormClosing(object sender, FormClosingEventArgs e)
         {
+            // 关闭窗体前停止后台轮询
+            StopPolling();
             // 解绑本窗体UI事件
             _switchDevice.OnDataReceived -= SwitchDevice_OnDataReceived;
             _switchDevice.OnDisconnected -= SwitchDevice_OnDisconnected;
@@ -214,20 +1053,6 @@ namespace Free_spaceOpticalCirculatorTestApp
             _switchDevice.OnError -= SwitchDevice_OnError;
             // 2.释放全部串口硬件资源
             SerialGlobalManager.DisposeAllPorts();
-        }
-        private void uiButton2_Click(object sender, EventArgs e)
-        {
-
-        }
-
-        private void uiGroupBox3_Click(object sender, EventArgs e)
-        {
-
-        }
-
-        private void uiButton6_Click(object sender, EventArgs e)
-        {
-
         }
         /// <summary>
         /// 刷新串口列表，已被全局管理器打开的端口标记
@@ -351,10 +1176,10 @@ namespace Free_spaceOpticalCirculatorTestApp
                 // ========= UI主线程操作 =========
                 // 保存【原始COM端口号】，不再保存显示文本，修复刷新后选不中BUG
                 string? lastSel1 = (uiComboBox1.SelectedItem as ComPortItem)?.ComPort;
-                string? lastSel2 = (uiComboBox3.SelectedItem as ComPortItem)?.ComPort;
+                string? lastSel2 = (switchCom.SelectedItem as ComPortItem)?.ComPort;
 
                 uiComboBox1.Items.Clear();
-                uiComboBox3.Items.Clear();
+                switchCom.Items.Clear();
 
                 foreach (var info in portInfoList)
                 {
@@ -366,11 +1191,11 @@ namespace Free_spaceOpticalCirculatorTestApp
                         IsOnline = isOnline
                     };
                     uiComboBox1.Items.Add(item);
-                    uiComboBox3.Items.Add(item);
+                    switchCom.Items.Add(item);
                 }
 
                 // 恢复上次选中：按ComPort匹配，不受显示文字、[已连接]标签影响
-                foreach (var cbo in new[] { uiComboBox1, uiComboBox3 })
+                foreach (var cbo in new[] { uiComboBox1, switchCom })
                 {
                     string? targetCom = cbo == uiComboBox1 ? lastSel1 : lastSel2;
                     if (!string.IsNullOrEmpty(targetCom))
@@ -393,10 +1218,6 @@ namespace Free_spaceOpticalCirculatorTestApp
             {
                 _isRefreshingComPort = false;
             }
-        }
-        private void uiComboBox1_SelectedIndexChanged(object sender, EventArgs e)
-        {
-
         }
         private void BindCombo(UIComboBox cbx)
         {
@@ -423,145 +1244,6 @@ namespace Free_spaceOpticalCirculatorTestApp
                 });
             }
         }
-
-        private async void uiButton3_Click(object sender, EventArgs e)
-        {
-            // 1. 获取所有勾选的 CheckBox
-            var checkedBoxes = GetCheckedBoxes(uiGroupBox3); // 假设你的容器叫 uiPanel1
-            // 2. 校验是否至少选择了一项
-            if (checkedBoxes.Count == 0)
-            {
-                MessageBox.Show("请至少选择一个测试项！", "警告", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                return;
-            }
-            // 3. 统计数量并输出日志
-            Console.WriteLine($"总共选中了 {checkedBoxes.Count} 项");
-            // 4.通过测试盒筛选归零值
-            var TestBoxSn = uiTextBox5.Text.Trim();
-            String DutSn = uiTextBox2.Text.Trim();
-            String DutType = comboBox1.Text.Trim();
-            double zeroSupplement = double.Parse(uiTextBox3.Text.Trim());
-            TestBoxZeroEntry entry = ZeroConfigManager.GetOrCreateBoxEntry(TestBoxSn);
-            List<ZeroCalibration> Items = entry.Items;
-            // 4. 遍历执行测试逻辑
-            foreach (var checkBox in checkedBoxes)
-            {
-                string itemName = checkBox.Text; // 获取显示的文本
-                ZeroCalibration? item = Items.FirstOrDefault(x => x.TestItemName == itemName);
-                if (item == null)
-                {
-                    Console.WriteLine($"未找到测试盒 {TestBoxSn} 的归零项 {itemName}，请检查输入的测试盒序列号是否正确是否存在于Config/zero_calibration.json。");
-                }
-                Console.WriteLine($"{itemName} + {item?.TestItemName}");
-                Console.WriteLine($"正在测试: {itemName}&&{item.TestItemId} ");
-                // 执行对应的测试方法...
-                //1.根据测试名 寻找对应开关状态，并执行开关操作
-                List<String> switchList = item.SWStatus;
-                //便利开关操作
-                for (int i = 0; i < switchList.Count; i++)
-                {
-                    if (switchList[i].Equals("0"))
-                    {
-                        continue;
-                    }
-                    if (i < 3)
-                    {
-                        //操作开关板1
-                        await _switchDevice.SwitchLightChannel(int.TryParse(switchList[i], out int channel) ? channel : 0);
-
-                    }
-                    else
-                    {
-                        if (switchList[i].Equals("1") || switchList[i].Equals("3"))
-                        {
-                            await _switchDevice2.SwitchLightChannel(2);
-                            Thread.Sleep(10); // 等待1秒，确保开关操作完成
-                        }
-                        //操作开关板2
-                        await _switchDevice2.SwitchLightChannel(int.TryParse(switchList[i], out int channel) ? channel : 0);
-                    }
-                    await Task.Delay(10);
-                }
-                await Task.Delay(300); // 等待100毫秒，确保开关操作完成
-                //1.4 读取功率计读数，得到归零值，更新日期和归零值大小到本地json文件，更新状态UI
-                //功率计通道暂时无法选择，手动修改配置表的命令可以选择读取的通道
-                double power = 0.0;
-                var device = _currentDevice;
-                if (device == null || !device.IsConnected)
-                {
-                    MessageBox.Show("请先连接功率计", "提示");
-                    return;
-                }
-                try
-                {
-                    var power2 = await device.ReadPowerAsync();
-                    power = double.Parse(power2.ToString("F4"));
-                    if (ReferenceEquals(_currentDevice, device))
-                    {
-                        Console.WriteLine($"功率读取成功: {power2:F4} dBm");
-                    }
-
-                }
-                catch (OperationCanceledException) when (!ReferenceEquals(_currentDevice, device))
-                {
-                    // Disconnect canceled the pending read.
-                }
-                catch (Exception ex)
-                {
-                    if (ReferenceEquals(_currentDevice, device))
-                        MessageBox.Show($"功率读取失败: {ex.Message}", "错误");
-                }
-
-                //2.采集光功率，并计算测试结果
-                double zeroValue = item?.ZeroValueDbm ?? 0.0;
-
-                //2.1 IL需要计算其他不用，需要做判断； 2.1.1 IL计算的时候还需要判断器件类型，确定需不需要再减去一个归零值
-                //IL = power - zeroValue - collimatorLoss
-                double collimatorLoss = double.Parse(uiTextBox3.Text.Trim());
-                double IL = 0.0;
-                IL = comboBox1.Text.Trim().Equals("自由空间类") ? power - zeroValue - collimatorLoss : power - zeroValue;
-                //3.填入测试结果到excel表里
-                await TestResultExcelWriter.AppendResult(new TestResultRow
-                {
-                    DutSn = DutSn,
-                    DutType = DutType,
-                    TestItemName = item.TestItemId + "-" + item.TestItemName,
-                    ZeroValue = zeroValue,
-                    ZeroSupplement = zeroSupplement,
-                    PowerMeterReading = power,
-                    TestResult = IL,
-                    ZeroDate = item.CalibratedAt,
-                }, "zcc");
-                Console.WriteLine("写入成功");
-            }
-        }
-
-        private List<UICheckBox> GetCheckedBoxes(Control container)
-        {
-            var result = new List<UICheckBox>();
-            foreach (Control ctrl in container.Controls)
-            {
-                if (ctrl is UICheckBox cb && cb.Checked)
-                {
-                    result.Add(cb);
-                }
-            }
-            return result.OrderBy(cb => cb.Top).ToList();
-        }
-
-        private void uiButton1_Click(object sender, EventArgs e)
-        {
-
-        }
-        private UIRadioButton GetSelectedRadioButton(Control container)
-        {
-            foreach (var ctrl in container.Controls)
-            {
-                if (ctrl is UIRadioButton rb && rb.Checked)
-                    return rb;
-            }
-            return null;
-        }
         //private void UpdateMarkLabel(string text)
         //{
         //    if (uiMarkLabel1.InvokeRequired)
@@ -573,6 +1255,15 @@ namespace Free_spaceOpticalCirculatorTestApp
         //        uiMarkLabel1.Text = text;
         //    }
         //}
+        public static string ExtractComPort(string input)
+        {
+            if (string.IsNullOrWhiteSpace(input))
+                return null;
+
+            // 匹配 COM + 一位或多位数字，兼容 COM1 ~ COM999
+            Match match = Regex.Match(input, @"COM\d+", RegexOptions.IgnoreCase);
+            return match.Success ? match.Value.ToUpper() : null;
+        }
         private async void uiButton1_Click_1(object sender, EventArgs e)
         {
             ITransport? transport = null;
@@ -580,50 +1271,12 @@ namespace Free_spaceOpticalCirculatorTestApp
 
             try
             {
-                //_lblStatus.Text = "正在连接...";
-
-                //var model = _cmbModel.SelectedItem?.ToString();
-                //if (string.IsNullOrEmpty(model))
-                //{
-                //    MessageBox.Show("请选择设备型号", "提示");
-                //    return;
-                //}
-
-                //var plugin = _pluginManager.FindPlugin(model);
-                //if (plugin == null)
-                //{
-                //    MessageBox.Show($"未找到支持 {model} 的插件", "错误");
-                //    return;
-                //}
-
-                //var transport = CreateTransport();
-                //var protocol = CreateProtocol();
-
-                //await transport.OpenAsync(_txtConnectionString.Text);
-
-                //_currentDevice = plugin.Create(transport, protocol, new Dictionary<string, string>
-                //{
-                //    ["model"] = model
-                //});
-
-                //await _currentDevice.ConnectAsync(_txtConnectionString.Text);
-
-                //// 更新 UI 状态
-                //_btnConnect.Enabled = false;
-                //_btnDisconnect.Enabled = true;
-                //_btnReadPower.Enabled = true;
-                //_btnSetWavelength.Enabled = true;
-                //_btnZero.Enabled = true;
-                //_txtWavelength.Enabled = true;
-                //_lblStatus.Text = $"已连接: {_currentDevice.Info}";
-
                 var model = Ommodel.SelectedItem?.ToString();
                 if (string.IsNullOrEmpty(model))
                 {
                     MessageBox.Show("请选择设备型号", "提示");
                     return;
                 }
-
                 var protocolName = Omprotocol.SelectedItem?.ToString();
                 var transportName = Omtransport.SelectedItem?.ToString();
                 var plugin = _pluginManager.FindPlugin(model, protocolName, transportName);
@@ -653,10 +1306,10 @@ namespace Free_spaceOpticalCirculatorTestApp
 
                 var protocol = protocolFactory.Invoke();
                 Console.WriteLine($"[DEBUG] 使用插件工厂创建协议: {protocol.GetType().Name}");
-
                 Console.WriteLine($"[DEBUG] 找到插件: {plugin?.GetType().Name} 协议: {protocolName} 传输: {transportName}");
                 //_currentDevice = plugin.Create(transport, protocol, new Dictionary<string, string>());
-                await transport.OpenAsync(Omtransportparams.Text);
+                String transportParams = ExtractComPort(switchCom.Text) + ":" + baudrate.Text;
+                await transport.OpenAsync(transportParams);
 
                 device = plugin.Create(transport, protocol, new Dictionary<string, string>
                 {
@@ -666,15 +1319,9 @@ namespace Free_spaceOpticalCirculatorTestApp
                 Global.opticalPowermeter = device;
                 Console.WriteLine($"[DEBUG] 创建设备实例: {device.GetType().FullName}+{protocol.GetType().Name}");
                 Console.WriteLine($"[DEBUG] 打开成功: {device.GetType().FullName}+{protocol.GetType().Name}");
-                //await device.ConnectAsync(Omtransportparams.Text);
-                // Keep the existing behavior: perform the first power read after connecting.
-                // SerialTransport now cancels this read when the user disconnects.
-                //await device.ReadPowerAsync();
             }
             catch (Exception ex)
             {
-                // A disconnect cancels an in-flight read. It is an expected transition,
-                // so do not show a misleading "connect failed" dialog in that case.
                 if (device != null && ReferenceEquals(_currentDevice, device))
                 {
                     _currentDevice = null;
@@ -732,17 +1379,7 @@ namespace Free_spaceOpticalCirculatorTestApp
             }
         }
 
-        private void uiGroupBox1_Click(object sender, EventArgs e)
-        {
-
-        }
-
         private void uiGroupBox1_Click_1(object sender, EventArgs e)
-        {
-
-        }
-
-        private void comboBox1_SelectedIndexChanged(object sender, EventArgs e)
         {
 
         }
@@ -1081,126 +1718,6 @@ namespace Free_spaceOpticalCirculatorTestApp
             }
         }
 
-        private async void TestZero_Click(object sender, EventArgs e)
-        {
-            //1.通过检测测试项、切换不同的开关状态
-            //1.1判断选择项
-            Console.WriteLine($"Selected Test Item: {uiCheckBoxGroup3.SelectedIndexes}");
-            var selected = GetSelectedRadioButton(uiCheckBoxGroup3);
-            if (selected != null)
-            {
-                Console.WriteLine($"Text: {selected.Text}");
-            }
-            // 获取某台盒子全部归零项
-            // 如果有对应测试盒则获取归零项
-            //{
-            //  "TestItemId": 1,
-            //"TestItemName": "Tx-Com(IL)",
-            //"Channel": "CH1",
-            //"ZeroValueDbm": -1.235,
-            //"CalibratedAt": "2026-08-18T09:00:00",
-            //"SWStatus": ["2", "6", "2"]
-            //} 
-            var TestBoxSn = uiTextBox4.Text.Trim();
-            Console.WriteLine($"Test Box SN: {TestBoxSn}");
-            TestBoxZeroEntry entry = ZeroConfigManager.GetOrCreateBoxEntry(TestBoxSn);
-            List<ZeroCalibration> Items = entry.Items;
-            ZeroCalibration? item = Items.FirstOrDefault(x => x.TestItemName == selected.Text);
-            //查不到测试盒就提示 然后不再执行
-            if (item == null)
-            {
-                MessageBox.Show($"未找到测试盒 {TestBoxSn} 的归零项，请检查输入的测试盒序列号是否正确是否存在于Config/zero_calibration.json。", "提示", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                return;
-            }
-            //1.2 根据测试项内容，查询本地json文件，获取对应的开关状态数组；
-            List<String> switchStatus = item.SWStatus;
-            //1.3 根据开关状态数组，执行对应的开关操作；
-            //获取一下TestItemId，方便后续写入json文件
-            String Powerchannel = item.Channel;
-            Console.WriteLine($"TestId: {item.TestItemId}, TestName: {item.TestItemName} Switch Status for {selected.Text}: {string.Join(", ", switchStatus)}");
-            List<String> switchList = item.SWStatus;
-            //便利开关操作
-            for (int i = 0; i < switchList.Count; i++)
-            {
-                if (switchList[i].Equals("0"))
-                {
-                    continue;
-                }
-                if (i < 3)
-                {
-                    //操作开关板1
-                    await _switchDevice.SwitchLightChannel(int.TryParse(switchList[i], out int channel) ? channel : 0);
-
-                }
-                else
-                {
-                    //操作开关板2
-                    if (switchList[i].Equals("1") || switchList[i].Equals("3"))
-                    {
-                        await _switchDevice2.SwitchLightChannel(2);
-                        Thread.Sleep(10); // 等待1秒，确保开关操作完成
-                    }
-                    await _switchDevice2.SwitchLightChannel(int.TryParse(switchList[i], out int channel) ? channel : 0);
-                }
-                await Task.Delay(10); // 等待10m秒，确保开关操作完成
-            }
-            await Task.Delay(300); // 等待0.3秒，确保开关操作完成
-            //1.4 读取功率计读数，得到归零值，更新日期和归零值大小到本地json文件，更新状态UI
-            //功率计通道暂时无法选择，手动修改配置表的命令可以选择读取的通道
-            var device = _currentDevice;
-            if (device == null || !device.IsConnected)
-            {
-                MessageBox.Show("请先连接功率计", "提示");
-                return;
-            }
-            try
-            {
-                var power = await device.ReadPowerAsync();
-                if (ReferenceEquals(_currentDevice, device))
-                {
-                    item.ZeroValueDbm = power;
-                    uiTextBox6.Text = power.ToString("F4");
-                    MessageBox.Show($"功率读取成功: {power:F4} dBm", "信息");
-                }
-
-            }
-            catch (OperationCanceledException) when (!ReferenceEquals(_currentDevice, device))
-            {
-                // Disconnect canceled the pending read.
-            }
-            catch (Exception ex)
-            {
-                if (ReferenceEquals(_currentDevice, device))
-                    MessageBox.Show($"功率读取失败: {ex.Message}", "错误");
-            }
-            // ========== 新增：更新归零数据 ==========
-            item.CalibratedAt = DateTime.Now;
-            // 更新外层盒子的LastUpdated
-            entry.LastUpdated = DateTime.Now;
-            ZeroConfigManager.UpdateItem(TestBoxSn, item);
-        }
-
-        private void uiButton1_Click_2(object sender, EventArgs e)
-        {
-            UIForm frm = new UIForm();
-            frm.Text = "图标预览";
-            frm.Size = new Size(900, 650);
-            FlowLayoutPanel flp = new FlowLayoutPanel { Dock = DockStyle.Fill, AutoScroll = true };
-            frm.Controls.Add(flp);
-
-            for (int i = 61440; i <= 62100; i++)
-            {
-                var lbl = new UISymbolLabel { Symbol = i, SymbolSize = 26, Text = $" {i}", Width = 130, Height = 44 };
-                flp.Controls.Add(lbl);
-            }
-            frm.ShowDialog();
-        }
-
-        private void uiLabel15_Click(object sender, EventArgs e)
-        {
-
-        }
-
         private void uiButton2_Click_1(object sender, EventArgs e)
         {
             try
@@ -1339,86 +1856,6 @@ namespace Free_spaceOpticalCirculatorTestApp
             }
         }
 
-        private async void uiButton9_Click(object sender, EventArgs e)
-        {
-            try
-            {
-                String ch = switchCh.Text.Trim();
-                int.TryParse(ch, out int value);
-                //示例切通道3
-                await _switchDevice.SwitchLightChannel(value);
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"切换通道失败：{ex.Message}");
-            }
-        }
-
-        private void uiButton4_Click(object sender, EventArgs e)
-        {
-            try
-            {
-                var selectItem = uiComboBox3.SelectedItem as ComPortItem;
-                if (selectItem == null)
-                {
-                    MessageBox.Show("请先选择串口！");
-                    return;
-                }
-
-                // 👉 判断：当前是要【打开】才赋值串口、波特率；关闭时不修改配置
-                if (uiButton4.Text == "打开")
-                {
-                    string comName = selectItem.ComPort.Trim();
-                    int baudrate;
-                    if (!int.TryParse(SwitchBaudrate.Text, out baudrate))
-                    {
-                        baudrate = 115200;
-                    }
-
-                    // 仅打开前设置参数
-                    _switchDevice2.ComPort = comName;
-                    _switchDevice2.BaudRate = baudrate;
-
-                    _switchDevice2.Open();
-                    bool ok = SerialGlobalManager.IsPortOnline(_switchDevice2.ComPort);
-                    Console.WriteLine($"打开后端口状态:{ok}");
-                    uiButton4.Text = "关闭";
-                    uiLight2.OnColor = Color.Green;
-                }
-                else
-                {
-                    // 关闭：直接Close，不再修改ComPort/BaudRate
-                    _switchDevice2.Close();
-                    uiButton4.Text = "打开";
-                    uiLight2.OnColor = Color.Red;
-                }
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"设备操作失败：{ex.Message}");
-            }
-        }
-
-        private void uiLabel18_Click(object sender, EventArgs e)
-        {
-
-        }
-
-        private async void uiButton9_Click_1(object sender, EventArgs e)
-        {
-            try
-            {
-                String ch = switchCh2.Text.Trim();
-                int.TryParse(ch, out int value);
-                //示例切通道3
-                await _switchDevice2.SwitchLightChannel(value);
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"切换通道失败：{ex.Message}");
-            }
-        }
-
         private void rtb_Log_TextChanged(object sender, EventArgs e)
         {
 
@@ -1429,278 +1866,114 @@ namespace Free_spaceOpticalCirculatorTestApp
             Global.readChannel = uiComboBox2.SelectedItem?.ToString() ?? string.Empty;
         }
 
-        private void uiButton10_Click(object sender, EventArgs e)
-        {
-            try
-            {
-                // 程序运行目录，如 ...\bin\Debug\net10.0-windows\
-                string appDir = AppContext.BaseDirectory;
-
-                // 拼接 Config 文件夹路径
-                string configDir = Path.Combine(appDir, "Config");
-
-                // 不存在则自动创建
-                if (!Directory.Exists(configDir))
-                {
-                    Directory.CreateDirectory(configDir);
-                }
-
-                // 用资源管理器打开
-                System.Diagnostics.Process.Start("explorer.exe", configDir);
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show(
-                    $"打开 Config 文件夹失败：{ex.Message}",
-                    "错误",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Error);
-            }
-        }
-
-        private async void uiButton11_Click(object sender, EventArgs e)
-        {
-            await PassFailTest.RunAllAndWriteExcel();
-        }
-
-        private async void uiButton12_Click(object sender, EventArgs e)
-        {
-            var TestBoxSn = uiTextBox4.Text.Trim();
-            TestBoxZeroEntry entry = ZeroConfigManager.GetOrCreateBoxEntry(TestBoxSn);
-            List<ZeroCalibration> Items = entry.Items;
-            ZeroCalibration? item = Items.FirstOrDefault(x => x.TestItemName == "Tx-Com(IL)");
-            //查不到测试盒就提示 然后不再执行
-            if (item == null)
-            {
-                MessageBox.Show($"未找到测试盒 {TestBoxSn} 的归零项，请检查输入的测试盒序列号是否正确是否存在于Config/zero_calibration.json。", "提示", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                return;
-            }
-            //1.2 根据测试项内容，查询本地json文件，获取对应的开关状态数组；
-            List<String> switchList = item.SWStatus;
-            //1.3 根据开关状态数组，执行对应的开关操作；
-            //获取一下TestItemId，方便后续写入json文件
-            //便利开关操作
-            for (int i = 0; i < switchList.Count; i++)
-            {
-                if (switchList[i].Equals("0"))
-                {
-                    continue;
-                }
-                if (i < 3)
-                {
-                    //操作开关板1
-                    await _switchDevice.SwitchLightChannel(int.TryParse(switchList[i], out int channel) ? channel : 0);
-
-                }
-                else
-                {
-                    //操作开关板2
-                    if (switchList[i].Equals("1") || switchList[i].Equals("3"))
-                    {
-                        await _switchDevice2.SwitchLightChannel(2);
-                        Thread.Sleep(10); // 等待1秒，确保开关操作完成
-                    }
-                    await _switchDevice2.SwitchLightChannel(int.TryParse(switchList[i], out int channel) ? channel : 0);
-                }
-                await Task.Delay(10); // 等待10m秒，确保开关操作完成
-            }
-            await Task.Delay(300); // 等待0.3秒，确保开关操作完成
-            //1.4 读取功率计读数，得到归零值，更新日期和归零值大小到本地json文件，更新状态UI
-            //功率计通道暂时无法选择，手动修改配置表的命令可以选择读取的通道
-            var device = _currentDevice;
-            if (device == null || !device.IsConnected)
-            {
-                MessageBox.Show("请先连接功率计", "提示");
-                return;
-            }
-            try
-            {
-                var power = await device.ReadPowerAsync();
-                if (ReferenceEquals(_currentDevice, device))
-                {
-                    uiTextBox6.Text = power.ToString("F4");
-                    double readPower = power;
-                    double zeroValue = item.ZeroValueDbm;
-                    double IL = CalculateIL(readPower, zeroValue);
-                    uiTextBox8.Text = IL.ToString("F4");
-                }
-
-            }
-            catch (OperationCanceledException) when (!ReferenceEquals(_currentDevice, device))
-            {
-                // Disconnect canceled the pending read.
-            }
-            catch (Exception ex)
-            {
-                if (ReferenceEquals(_currentDevice, device))
-                    MessageBox.Show($"功率读取失败: {ex.Message}", "错误");
-            }
-        }
-        private double CalculateIL(double readPower, double zeroValue)
-        {
-            double collimatorLoss = double.Parse(uiTextBox3.Text.Trim());
-            double IL = 0.0;
-            IL = comboBox1.Text.Trim().Equals("自由空间类") ? readPower - zeroValue - collimatorLoss : readPower - zeroValue;
-            return IL;
-        }
-
-        private async void uiButton13_Click(object sender, EventArgs e)
-        {
-            var TestBoxSn = uiTextBox4.Text.Trim();
-            TestBoxZeroEntry entry = ZeroConfigManager.GetOrCreateBoxEntry(TestBoxSn);
-            List<ZeroCalibration> Items = entry.Items;
-            ZeroCalibration? item = Items.FirstOrDefault(x => x.TestItemName == "Com-Rx(IL)");
-            //查不到测试盒就提示 然后不再执行
-            if (item == null)
-            {
-                MessageBox.Show($"未找到测试盒 {TestBoxSn} 的归零项，请检查输入的测试盒序列号是否正确是否存在于Config/zero_calibration.json。", "提示", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                return;
-            }
-            //1.2 根据测试项内容，查询本地json文件，获取对应的开关状态数组；
-            List<String> switchStatus = item.SWStatus;
-            //1.3 根据开关状态数组，执行对应的开关操作；
-            //获取一下TestItemId，方便后续写入json文件
-            List<String> switchList = item.SWStatus;
-            //便利开关操作
-            for (int i = 0; i < switchList.Count; i++)
-            {
-                if (switchList[i].Equals("0"))
-                {
-                    continue;
-                }
-                if (i < 3)
-                {
-                    //操作开关板1
-                    await _switchDevice.SwitchLightChannel(int.TryParse(switchList[i], out int channel) ? channel : 0);
-
-                }
-                else
-                {
-                    //操作开关板2
-                    if (switchList[i].Equals("1") || switchList[i].Equals("3"))
-                    {
-                        await _switchDevice2.SwitchLightChannel(2);
-                        Thread.Sleep(10); // 等待1秒，确保开关操作完成
-                    }
-                    await _switchDevice2.SwitchLightChannel(int.TryParse(switchList[i], out int channel) ? channel : 0);
-                }
-                await Task.Delay(10); // 等待10m秒，确保开关操作完成
-            }
-            await Task.Delay(300); // 等待0.3秒，确保开关操作完成
-            //1.4 读取功率计读数，得到归零值，更新日期和归零值大小到本地json文件，更新状态UI
-            //功率计通道暂时无法选择，手动修改配置表的命令可以选择读取的通道
-            var device = _currentDevice;
-            if (device == null || !device.IsConnected)
-            {
-                MessageBox.Show("请先连接功率计", "提示");
-                return;
-            }
-            try
-            {
-                var power = await device.ReadPowerAsync();
-                if (ReferenceEquals(_currentDevice, device))
-                {
-                    uiTextBox6.Text = power.ToString("F4");
-                    double readPower = power;
-                    double zeroValue = item.ZeroValueDbm;
-                    double IL = CalculateIL(readPower, zeroValue);
-                    uiTextBox8.Text = IL.ToString("F4");
-                }
-
-            }
-            catch (OperationCanceledException) when (!ReferenceEquals(_currentDevice, device))
-            {
-                // Disconnect canceled the pending read.
-            }
-            catch (Exception ex)
-            {
-                if (ReferenceEquals(_currentDevice, device))
-                    MessageBox.Show($"功率读取失败: {ex.Message}", "错误");
-            }
-        }
-
         private void uiButton14_Click(object sender, EventArgs e)
         {
             rtb_Log.Clear();
         }
 
-        private async void uiButton15_Click(object sender, EventArgs e)
+        private void uiSymbolLabel1_Click(object sender, EventArgs e)
         {
-            var TestBoxSn = uiTextBox4.Text.Trim();
-            TestBoxZeroEntry entry = ZeroConfigManager.GetOrCreateBoxEntry(TestBoxSn);
-            List<ZeroCalibration> Items = entry.Items;
-            ZeroCalibration? item = Items.FirstOrDefault(x => x.TestItemName == "Tx-Rx(DIR)");
-            //查不到测试盒就提示 然后不再执行
-            if (item == null)
-            {
-                MessageBox.Show($"未找到测试盒 {TestBoxSn} 的归零项，请检查输入的测试盒序列号是否正确是否存在于Config/zero_calibration.json。", "提示", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                return;
-            }
-            //1.2 根据测试项内容，查询本地json文件，获取对应的开关状态数组；
-            List<String> switchList = item.SWStatus;
-            //1.3 根据开关状态数组，执行对应的开关操作；
-            //获取一下TestItemId，方便后续写入json文件
-            //便利开关操作
-            for (int i = 0; i < switchList.Count; i++)
-            {
-                if (switchList[i].Equals("0"))
-                {
-                    continue;
-                }
-                if (i < 3)
-                {
-                    //操作开关板1
-                    await _switchDevice.SwitchLightChannel(int.TryParse(switchList[i], out int channel) ? channel : 0);
 
-                }
-                else
-                {
-                    //操作开关板2
-                    if (switchList[i].Equals("1") || switchList[i].Equals("3"))
-                    {
-                        await _switchDevice2.SwitchLightChannel(2);
-                        Thread.Sleep(10); // 等待1秒，确保开关操作完成
-                    }
-                    await _switchDevice2.SwitchLightChannel(int.TryParse(switchList[i], out int channel) ? channel : 0);
-                }
-                await Task.Delay(10); // 等待10m秒，确保开关操作完成
-            }
-            await Task.Delay(300); // 等待0.3秒，确保开关操作完成
-            //1.4 读取功率计读数，得到归零值，更新日期和归零值大小到本地json文件，更新状态UI
-            //功率计通道暂时无法选择，手动修改配置表的命令可以选择读取的通道
-            var device = _currentDevice;
-            if (device == null || !device.IsConnected)
+        }
+        /// <summary>当前软件版本号，自动从程序集读取（对应 .csproj 里的 <Version>）</summary>
+        public static string AppVersion
+        {
+            get
             {
-                MessageBox.Show("请先连接功率计", "提示");
-                return;
+                try
+                {
+                    // 优先用 ProductVersion（对应 .csproj 的 <Version>，3 段式如 1.0.9）
+                    var loc = Assembly.GetExecutingAssembly().Location;
+                    if (!string.IsNullOrEmpty(loc) && File.Exists(loc))
+                    {
+                        var ver = System.Diagnostics.FileVersionInfo.GetVersionInfo(loc).ProductVersion;
+                        // 去掉 Git 提交哈希后缀（如 1.0.0+abc1234 → 1.0.0）
+                        if (!string.IsNullOrEmpty(ver))
+                        {
+                            int plusIdx = ver.IndexOf('+');
+                            if (plusIdx > 0) ver = ver.Substring(0, plusIdx);
+                            return ver;
+                        }
+
+                    }
+                    // 单文件发布时回退到 AssemblyVersion（4 段式，去掉末尾的 .0）
+                    var asmVer = Assembly.GetExecutingAssembly().GetName().Version;
+                    if (asmVer is not null)
+                        return asmVer.Revision == 0
+                            ? $"{asmVer.Major}.{asmVer.Minor}.{asmVer.Build}"
+                            : asmVer.ToString();
+                }
+                catch { }
+                return "1.0.0";
             }
+        }
+
+        private async void uiSymbolLabel7_Click(object sender, EventArgs e)
+        {
             try
             {
-                var power = await device.ReadPowerAsync();
-                if (ReferenceEquals(_currentDevice, device))
+                String updateUrl = "//192.168.0.150/研发部文件共享/软件组/SoftwareRepository/环形器自动测试/update/appcast.xml";
+                var appcast = updateUrl.Trim();
+                if (string.IsNullOrWhiteSpace(appcast))
                 {
-                    uiTextBox6.Text = power.ToString("F4");
-                    double readPower = power;
-                    double zeroValue = item.ZeroValueDbm;
-                    double IL = CalculateIL(readPower, zeroValue);
-                    uiTextBox8.Text = IL.ToString("F4");
+                    Console.WriteLine("请先填写 AppCast 地址");
+                    MessageBox.Show("请先填写 AppCast 地址（http(s):// 或 \\\\server\\share\\appcast.xml）",
+                        "错误", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    return;
                 }
 
-            }
-            catch (OperationCanceledException) when (!ReferenceEquals(_currentDevice, device))
-            {
-                // Disconnect canceled the pending read.
+                _autoUpdate = new AutoUpdateService(this, appcast, Log);
+                _autoUpdate.CheckUpdate();
             }
             catch (Exception ex)
             {
-                if (ReferenceEquals(_currentDevice, device))
-                    MessageBox.Show($"功率读取失败: {ex.Message}", "错误");
+                Console.WriteLine($"检查更新失败: {ex.Message}");
+                Console.WriteLine($"堆栈: {ex.StackTrace}");
+                MessageBox.Show($"更新失败: {ex.Message}", "错误",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
+        private void Log(string msg)
+        {
+            if (rtb_Log.InvokeRequired)
+            {
+                rtb_Log.Invoke(new Action<string>(Log), msg);
+                return;
+            }
+            rtb_Log.AppendText($"[{DateTime.Now:HH:mm:ss}] {msg}\r\n");
+            rtb_Log.ScrollToCaret();
+        }
 
-        private void uiToolTip1_Popup(object sender, PopupEventArgs e)
+        private void uiLabel8_Click(object sender, EventArgs e)
         {
 
         }
+
+        /// <summary>
+        /// 检查更新并按需弹窗（直连 SMB 共享目录模式F
+        /// silentWhenNoUpdate=true：无新版本时不弹"已是最新"（用于启动自动检查）
+        /// silentOnError=true：检查失败时不弹错误框，仅写日志（用于启动自动检查）
+        /// </summary>
+
+
+        /// <summary>构建时间，从程序集元数据读取（.csproj 里配置，编译时自动注入）</summary>
+        /// <summary>构建时间，直接读取 exe 文件的最后修改时间（不需要 .csproj 配置）</summary>
+        public static string BuildTime
+        {
+            get
+            {
+                try
+                {
+                    var loc = System.Reflection.Assembly.GetExecutingAssembly().Location;
+                    if (!string.IsNullOrEmpty(loc) && System.IO.File.Exists(loc))
+                        return System.IO.File.GetLastWriteTime(loc).ToString("yyyy-MM-dd HH:mm:ss");
+                }
+                catch { }
+                return "未知";
+            }
+        }
+
+
+
     }
 }

@@ -1,4 +1,4 @@
-﻿Free_spaceOpticalCirculatorTestApp
+﻿MultiOpticalSwitchTestApp
 ├─ ComunicationTransport
 │   ├─ AsyncSerialPort.cs          // 不变
 │   └─ SerialGlobalManager.cs      // 修改后的多路静态管理器

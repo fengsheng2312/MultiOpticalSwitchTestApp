@@ -1,0 +1,103 @@
+{
+  "version": "1.0",
+  "description": "光源归零差值配置（按波长分组，光源序号1~9）",
+  "updated_at": "2026-10-12",
+  "wavelengths": {
+    "1310": {
+      "unit": "nm",
+      "zero_diff": {
+        "1": {
+          "zero_value": 0.0,
+          "switch_name": "SwitchA",
+          "channel": 1,
+          "core": "2"
+        },
+        "2": {
+          "zero_value": 0.0,
+          "switch_name": "SwitchA",
+          "channel": 2,
+          "core": "12"
+        },
+        "3": {
+          "zero_value": 0.0,
+          "switch_name": "SwitchA",
+          "channel": 3,
+          "core": "85"
+        },
+        "4": {
+          "zero_value": 0.0,
+          "switch_name": "SwitchB",
+          "channel": 1,
+          "core": "1"
+        },
+        "5": {
+          "zero_value": 0.0,
+          "switch_name": "SwitchB",
+          "channel": 2,
+          "core": "12"
+        },
+        "6": {
+          "zero_value": 0.0,
+          "switch_name": "SwitchB",
+          "channel": 3,
+          "core": "85"
+        },
+        "7": {
+          "zero_value": 0.0,
+          "switch_name": "SwitchC",
+          "channel": 1,
+          "core": "1"
+        },
+        "8": {
+          "zero_value": 0.0,
+          "switch_name": "SwitchC",
+          "channel": 2,
+          "core": "12"
+        },
+        "9": {
+          "zero_value": 0.0,
+          "switch_name": "SwitchC",
+          "channel": 3,
+          "core": "85"
+        },
+        "10": {
+          "zero_value": 0.0,
+          "switch_name": "SwitchD",
+          "channel": 1,
+          "core": "1"
+        },
+        "11": {
+          "zero_value": 0.0,
+          "switch_name": "SwitchD",
+          "channel": 2,
+          "core": "12"
+        },
+        "12": {
+          "zero_value": 0.0,
+          "switch_name": "SwitchD",
+          "channel": 3,
+          "core": "85"
+        },
+        "13": {
+          "zero_value": 0.0,
+          "switch_name": "SwitchE",
+          "channel": 1,
+          "core": "1"
+        },
+        "14": {
+          "zero_value": 0.0,
+          "switch_name": "SwitchE",
+          "channel": 2,
+          "core": "12"
+        },
+        "15": {
+          "zero_value": 0.0,
+          "switch_name": "SwitchE",
+          "channel": 3,
+          "core": "85"
+        }
+      }
+    },
+    "1550": {}
+  }
+}

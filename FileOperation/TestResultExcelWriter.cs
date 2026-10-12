@@ -6,7 +6,7 @@ using OfficeOpenXml;
 using OfficeOpenXml.Style;
 using System.Drawing;
 
-namespace Free_spaceOpticalCirculatorTestApp.FileOperation
+namespace MultiOpticalSwitchTestApp.FileOperation
 {
     /// <summary>
     /// 单行测试结果数据模型，字段与 Excel 列一一对应

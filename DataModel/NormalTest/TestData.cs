@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Text;
 
-namespace Free_spaceOpticalCirculatorTestApp.DataModel.NormalTest
+namespace MultiOpticalSwitchTestApp.DataModel.NormalTest
 {
     public class TestData
     {   
