@@ -11,6 +11,7 @@ namespace MultiOpticalSwitchTestApp
     /// 光源轮询测试结果展示窗（非模态）。
     /// 打开时不自动执行：点击“开始轮询”后主窗体才启动后台切换与读数；点击“停止轮询”结束。
     /// 归零值列可由用户手工修改，轮询线程检测到与 zeroDiff.json 不一致时会写回配置文件。
+    /// 后台线程只读本窗体维护的归零值字典（加锁），不再跨线程同步读表格，避免死锁与并发崩溃。
     /// </summary>
     public class SwitchPollForm : UIForm
     {
@@ -22,6 +23,10 @@ namespace MultiOpticalSwitchTestApp
         private readonly Dictionary<string, DataGridViewRow> _rows =
             new(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<int, double> _lastValidZero = new();
+
+        // 归零值镜像：UI 线程写入，轮询线程加锁读取（替代 Invoke 同步取表格值）
+        private readonly Dictionary<string, double> _zeroValues = new(StringComparer.OrdinalIgnoreCase);
+        private readonly object _zeroLock = new();
 
         /// <summary>一条轮询数据：光源序号、归零值、core、开关名、通道。</summary>
         public record PollItem(string LightNo, double ZeroValue, string Core, string SwitchName, int Channel);
@@ -135,6 +140,7 @@ namespace MultiOpticalSwitchTestApp
                 row.Cells["colPower"].Style.Alignment = DataGridViewContentAlignment.MiddleLeft;
                 row.Cells["colActual"].Style.Alignment = DataGridViewContentAlignment.MiddleLeft;
                 _rows[it.LightNo] = row;
+                _zeroValues[it.LightNo] = it.ZeroValue;
             }
 
             // 归零值输入校验：非法内容回退到上一次的合法值
@@ -151,6 +157,26 @@ namespace MultiOpticalSwitchTestApp
                     _lastValidZero[e.RowIndex] = v;
                 }
             };
+
+            // 编辑提交后把合法值同步进字典，供轮询线程加锁读取
+            _grid.CellEndEdit += (_, e) =>
+            {
+                if (e.RowIndex < 0 || _grid.Columns[e.ColumnIndex].Name != "colZero") return;
+                string lightNo = Convert.ToString(_grid.Rows[e.RowIndex].Cells["colNo"].Value,
+                    CultureInfo.InvariantCulture) ?? string.Empty;
+                string text = Convert.ToString(_grid.Rows[e.RowIndex].Cells[e.ColumnIndex].Value,
+                    CultureInfo.InvariantCulture) ?? string.Empty;
+                if (double.TryParse(text.Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out double v))
+                {
+                    lock (_zeroLock)
+                    {
+                        _zeroValues[lightNo] = v;
+                    }
+                }
+            };
+
+            // 后台线程刷新与用户编辑并发时，DataGridView 可能抛数据错误；不处理会直接冒泡成崩溃
+            _grid.DataError += (_, e) => { e.ThrowException = false; };
 
             Controls.Add(_grid);
             Controls.Add(topPanel);
@@ -193,30 +219,25 @@ namespace MultiOpticalSwitchTestApp
                 : "未运行";
         }
 
-        /// <summary>读取指定光源行当前的归零值（线程安全）；内容非法时回退 0。</summary>
+        /// <summary>
+        /// 读取指定光源当前归零值。可在任意线程调用：只读加锁字典，不触碰控件句柄，
+        /// 因此不会再与 UI 线程的模态弹窗相互等待造成死锁。
+        /// </summary>
         public double GetZeroValue(string lightNo)
         {
-            if (IsDisposed) return 0.0;
-            if (InvokeRequired)
+            lock (_zeroLock)
             {
-                return (double)Invoke(new Func<double>(() => GetZeroValueCore(lightNo)));
+                return _zeroValues.TryGetValue(lightNo, out double v) ? v : 0.0;
             }
-            return GetZeroValueCore(lightNo);
         }
 
-        private double GetZeroValueCore(string lightNo)
-        {
-            if (!_rows.TryGetValue(lightNo, out var row)) return 0.0;
-            string text = Convert.ToString(row.Cells["colZero"].Value, CultureInfo.InvariantCulture) ?? string.Empty;
-            return double.TryParse(text.Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out double v)
-                ? v
-                : 0.0;
-        }
-
-        /// <summary>刷新指定光源行的功率计显示值与实际值（线程安全）。</summary>
+        /// <summary>
+        /// 刷新指定光源行的功率计显示值与实际值（跨线程安全）。
+        /// 该行正处于编辑态时跳过本次刷新，避免与用户输入争抢单元格。
+        /// </summary>
         public void UpdateResult(string lightNo, string powerText, string actualText)
         {
-            if (IsDisposed) return;
+            if (IsDisposed || !IsHandleCreated) return;
             try
             {
                 if (InvokeRequired)
@@ -224,11 +245,17 @@ namespace MultiOpticalSwitchTestApp
                     BeginInvoke(new Action(() => UpdateResult(lightNo, powerText, actualText)));
                     return;
                 }
-                if (_rows.TryGetValue(lightNo, out var row))
+                if (!_rows.TryGetValue(lightNo, out var row)) return;
+
+                if (_grid.IsCurrentCellInEditMode &&
+                    _grid.CurrentCell is not null &&
+                    _grid.CurrentCell.RowIndex == row.Index)
                 {
-                    row.Cells["colPower"].Value = powerText;
-                    row.Cells["colActual"].Value = actualText;
+                    return;
                 }
+
+                row.Cells["colPower"].Value = powerText;
+                row.Cells["colActual"].Value = actualText;
             }
             catch (ObjectDisposedException)
             {
@@ -237,6 +264,10 @@ namespace MultiOpticalSwitchTestApp
             catch (InvalidOperationException)
             {
                 // 句柄已销毁竞态，忽略
+            }
+            catch (ArgumentException)
+            {
+                // 单元格已被移除等表格状态竞态，忽略
             }
         }
     }

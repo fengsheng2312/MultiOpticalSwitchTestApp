@@ -1,5 +1,5 @@
 <Solution>
-  <Project Path="../Plugins.JW8102Private/Plugins.JW8102Private.csproj" />
-  <Project Path="../Plugins.OHPM08/Plugins.OHPM08.csproj" Id="c3fd9247-dff6-45d2-92c2-a59e92d46b9e" />
+  <Project Path="../../Plugins.JW8102Private/Plugins.JW8102Private.csproj" />
+  <Project Path="../../Plugins.OHPM08/Plugins.OHPM08.csproj" Id="c3fd9247-dff6-45d2-92c2-a59e92d46b9e" />
   <Project Path="MultiOpticalSwitchTestApp.csproj" />
 </Solution>

@@ -1,0 +1,50 @@
+{
+  "Model": "Opm7320C",
+  "Vendor": "commpolar（严浩）",
+  "Protocol": "SCPI",
+  "DefaultTransport": "Serial",
+  "HighSpeedModeCommand": "SENSe:POWer:MODe 1",
+  "SupportedTransports": ["Serial"],
+  "SerialSettings": {
+    "BaudRate": 9600,
+    "DataBits": 8,
+    "StopBits": "One",
+    "Parity": "None",
+    "Handshake": "None"
+  },
+  "Commands": {
+    "ReadPower": "READ{CH}:SCALar:POWer:DC?",
+    "SetWavelength": "SENS:POW:WAV {waveLen} nm",
+    "GetWavelength": "SENS:POW:WAV?",
+    "Zero": "SENSe:CORRection:COLLect:ZERO:ALL",
+    "GetIdn": "*IDN?"
+  },
+  "Turbo": {
+    "Enabled": false,
+    "StartFrame": "EE AA 60 00 00 00",
+    "StopFrame": "EE AA 60 01 00 00",
+    "FrameHeader": 0,
+    "ChannelCount": 4,
+    "BytesPerChannel": 2,
+    "Encoding": "Int16BE",
+    "ByteOrder": "Big",
+    "FractionDivisor": 100.0,
+    "Signed": false,
+    "RawOffset": 9000.0,
+    "RawScale": 83.84,
+    "Scale": 1.0,
+    "Offset": 0.0,
+    "FirstFrameTimeoutMs": 800
+  },
+  "ResponseParser": {
+    "ReadPower": {
+      "Format": "Numeric",
+      "Unit": "dBm"
+    }
+  },
+  "WavelengthScale": 1.0,
+  "PowerScale": 1.0,
+  "PowerOffset": 0.0,
+  "ReadTimeoutMs": 3000,
+  "Extra": {}
+}

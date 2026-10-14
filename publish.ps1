@@ -30,6 +30,9 @@
     共享上已存在同版本号但内容不同的 zip 时，强制覆盖（默认拒绝，防止旧清单校验失败）
 .PARAMETER NoPlugins
     跳过插件组装（默认会按解决方案编译插件并放入 Plugins\，缺失则发布中止）
+.PARAMETER SingleFile
+    单文件发布：所有 DLL 并入一个 exe，产物只剩 主程序exe + Config\ + Plugins\ + Updater\
+    （运行时依赖仍由 -SelfContained 决定；自包含时可单文件内压缩，框架依赖时不支持压缩）
 .EXAMPLE
     .\publish.ps1
     自动叠加修订号（1.0.0 -> 1.0.1）并发布到共享 update 目录（zip + appcast.xml 一步到位）
@@ -60,14 +63,16 @@ param(
     [switch]$Mandatory,
     [switch]$NoDeploy,
     [switch]$ForceDeploy,
-    [switch]$NoPlugins
+    [switch]$NoPlugins,
+    [switch]$SingleFile
 )
 
 $ErrorActionPreference = "Stop"
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $CsprojPath = Join-Path $ScriptDir "MultiOpticalSwitchTestApp.csproj"
 $PublishDir = Join-Path $ScriptDir "publish"
-$ProductName = "MultiOpticalSwitchTestApp"
+# 打包产物名（zip 前缀）：core调节测试软件_v版本号.zip；主程序 exe 仍为 MultiOpticalSwitchTestApp.exe，两者互不影响
+$ProductName = "core调节测试软件"
 $SlnxPath = Join-Path $ScriptDir "MultiOpticalSwitchTestApp.slnx"
 $RepositoryRoot = Split-Path -Parent $ScriptDir
 
@@ -368,7 +373,21 @@ if (Test-Path $PublishDir) {
 # ============================================================
 Write-Host "`n[3/4] 编译发布..." -ForegroundColor Yellow
 $selfContainedArg = if ($SelfContained) { "--self-contained" } else { "--no-self-contained" }
-dotnet publish $CsprojPath -c Release -r $Runtime $selfContainedArg -o $PublishDir --nologo
+
+# 单文件发布：所有托管 DLL 与原生库并入一个 exe；压缩仅自包含模式支持
+$singleFileArgs = @()
+if ($SingleFile) {
+    $singleFileArgs = @(
+        "-p:PublishSingleFile=true",
+        "-p:IncludeNativeLibrariesForSelfExtract=true",
+        "-p:DebugType=none",
+        "-p:DebugSymbols=false"
+    )
+    if ($SelfContained) { $singleFileArgs += "-p:EnableCompressionInSingleFile=true" }
+    Write-Host "  单文件模式：产物将只有 MultiOpticalSwitchTestApp.exe + 外置文件夹" -ForegroundColor Cyan
+}
+
+dotnet publish $CsprojPath -c Release -r $Runtime $selfContainedArg @singleFileArgs -o $PublishDir --nologo
 if ($LASTEXITCODE -ne 0) {
     Write-Host "错误：编译发布失败" -ForegroundColor Red
     exit 1
@@ -452,13 +471,26 @@ Write-Host "`n[3.5/4] 编译 Updater..." -ForegroundColor Yellow
 $UpdaterCsproj = Join-Path $ScriptDir "Updater\Updater.csproj"
 $UpdaterPublishDir = Join-Path $ScriptDir "Updater\publish"
 if (Test-Path $UpdaterPublishDir) { Remove-Item $UpdaterPublishDir -Recurse -Force }
-dotnet publish $UpdaterCsproj -c Release -r $Runtime $selfContainedArg -o $UpdaterPublishDir --nologo
+dotnet publish $UpdaterCsproj -c Release -r $Runtime $selfContainedArg @singleFileArgs -o $UpdaterPublishDir --nologo
 if ($LASTEXITCODE -ne 0) {
     Write-Host "警告：Updater 编译失败，更新功能将不可用" -ForegroundColor Yellow
 } else {
     $destUpdaterDir = Join-Path $PublishDir "Updater"
     Copy-Item $UpdaterPublishDir -Destination $destUpdaterDir -Recurse -Force
     Write-Host "  Updater 已复制到发布目录" -ForegroundColor Green
+}
+
+# ============================================================
+# 4.8 单文件模式清理：移除无运行时作用的文档/符号文件，让产物只剩 exe + 文件夹
+# ============================================================
+if ($SingleFile) {
+    Write-Host "`n[3.8/4] 清理单文件产物杂项..." -ForegroundColor Yellow
+    $junk = @(Get-ChildItem $PublishDir -Recurse -File -Include "*.xml", "*.pdb" -ErrorAction SilentlyContinue)
+    foreach ($f in $junk) { Remove-Item -LiteralPath $f.FullName -Force }
+    Write-Host "  已清理杂项文件 $($junk.Count) 个（xml/pdb）" -ForegroundColor Green
+
+    $topFiles = @(Get-ChildItem $PublishDir -File)
+    Write-Host "  产物根目录：$($topFiles.Name -join ', ')" -ForegroundColor DarkGray
 }
 
 # ============================================================

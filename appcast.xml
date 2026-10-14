@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <item>
-  <version>1.0.25</version>
-  <url>file://192.168.0.150/研发部文件共享/软件组/SoftwareRepository/环形器自动测试/update/MultiOpticalSwitchTestApp_v1.0.25.zip</url>
+  <version>1.0.2</version>
+  <url>file://192.168.0.150/研发部文件共享/软件组/SoftwareRepository/环形器自动测试/update/core调节测试软件_v1.0.2.zip</url>
   <mandatory>false</mandatory>
-  <checksum algorithm="SHA256">0884CB126FDF0315F4528B5A32A5F26EB2398CFB500E7531BB9E20DC1067B6C3</checksum>
+  <checksum algorithm="SHA256">423028F68CADD98A08A2464C34CF960BD2AB534B7B7179D4345229732C001136</checksum>
 </item>

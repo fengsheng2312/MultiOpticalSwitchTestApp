@@ -19,11 +19,11 @@ namespace MultiOpticalSwitchTestApp.Command
         /// <param name="channel">通道号（channels 数组元素，1~8）</param>
         public byte[] SwitchLightChannel(int id, int channel)
         {
-            if (id < 1 || id > 5)
-                throw new ArgumentOutOfRangeException(nameof(id), "开关编号必须 1~5");
-            if (channel < 1 || channel > 8)
-                throw new ArgumentOutOfRangeException(nameof(channel), "通道必须 1~8");
-            return new byte[] { 0x5A, 0xA5, (byte)id, (byte)channel };
+            // 拼接字符串命令，末尾加 \r\n 作为结束符（根据协议文档确认是否需要）
+            string command = $"SMSCH {id} {channel}\r\n";
+
+            // 转成 ASCII 字节流
+            return Encoding.ASCII.GetBytes(command);
         }
     }
 }

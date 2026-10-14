@@ -10,7 +10,8 @@ using OpticalMeter.Host;
 using Plugins.GenericScpiPowerMeter;
 using Sunny.UI;
 using Sunny.UI.Win32;
-using System.Collections.Generic; 
+using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.IO.Ports;
 using System.Management;
 using System.Reflection;
@@ -42,6 +43,8 @@ namespace MultiOpticalSwitchTestApp
         private readonly command _switchCommand = new();
         // 通道按钮只生成一次，避免重复加载
         private bool _switchChannelButtonsBuilt;
+        // 每行 Core编号 左侧的勾选框，全量轮询只执行被勾选的通道
+        private readonly List<UICheckBox> _coreCheckboxes = new();
         // 开关板原始接收缓存，用来拼接分片字节
 
         //烧录初始化
@@ -171,15 +174,11 @@ namespace MultiOpticalSwitchTestApp
             // 界面加载完成、控件已经创建完毕，在这里刷新串口下拉框
             _ = RefreshAllSerialPortCombosAsync();
             await LoadPlugins();
-            var cbos = new UIComboBox[] { SwitchBaudrate, baudrate };
+            var cbos = new UIComboBox[] { SwitchBaudrate, opticalbaudrate };
             uiComboBox2.SelectedIndex = 0;
-            foreach (var cbo in cbos)
-            {
-                if (cbo.Items.Count > 0)
-                {
-                    cbo.SelectedIndex = 0;
-                }
-            }
+            cbos[0].SelectedIndex = 0;
+            cbos[1].SelectedIndex = 1;
+            Ommodel.SelectedIndex = 3;
             // 订阅设备业务事件（IO后台线程，UI必须Invoke）
             // 订阅设备业务事件（IO后台线程，UI必须Invoke）
             _switchDevice.OnDataReceived += SwitchDevice_OnDataReceived;
@@ -238,9 +237,13 @@ namespace MultiOpticalSwitchTestApp
         /// <summary>把GBK中文输出到rtb_Log，自动跨线程</summary>
         private void AppendGbkLog(string text)
         {
+            if (rtb_Log.IsDisposed) return;
             if (rtb_Log.InvokeRequired)
             {
-                rtb_Log.Invoke(new Action<string>(AppendGbkLog), text);
+                // 与 OnSerialLog 一致：异步投递，避免后台线程与 UI 线程互相等待造成卡死/崩溃
+                try { rtb_Log.BeginInvoke(new Action<string>(AppendGbkLog), text); }
+                catch (ObjectDisposedException) { }
+                catch (InvalidOperationException) { }
                 return;
             }
             string line = $"{DateTime.Now:HH:mm:ss} [RX] {text}\r\n";
@@ -328,9 +331,10 @@ namespace MultiOpticalSwitchTestApp
                 (int id, string name, List<int> channels, List<string> cores) = switches[p];
                 panel.Controls.Clear();
 
-                // 列：Core编号标签 | 输入框 | 通道按钮 | 剩余填充
-                panel.ColumnCount = 4;
+                // 列：勾选框 | Core编号标签 | 输入框 | 通道按钮 | 剩余填充
+                panel.ColumnCount = 5;
                 panel.ColumnStyles.Clear();
+                panel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 28F));
                 panel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 74F));
                 panel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 64F));
                 panel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 150F));
@@ -357,12 +361,26 @@ namespace MultiOpticalSwitchTestApp
                 };
                 panel.Controls.Add(nameLabel);
                 panel.SetCellPosition(nameLabel, new TableLayoutPanelCellPosition(0, 0));
-                panel.SetColumnSpan(nameLabel, 4);
+                panel.SetColumnSpan(nameLabel, 5);
 
                 for (int c = 0; c < channels.Count; c++)
                 {
                     int channel = channels[c];
                     int row = c + 1;
+
+                    // Core编号 左侧勾选框：全量轮询只执行勾选中的通道（Tag 记录开关名与通道，供过滤匹配）
+                    var coreCheck = new UICheckBox
+                    {
+                        Name = $"coreCheck_{id}_{channel}",
+                        Text = "",
+                        Dock = DockStyle.Fill,
+                        Margin = new Padding(4, 0, 0, 0),
+                        Font = new Font("宋体", 9F),
+                    };
+                    coreCheck.Tag = (id, channel, name);
+                    panel.Controls.Add(coreCheck);
+                    panel.SetCellPosition(coreCheck, new TableLayoutPanelCellPosition(0, row));
+                    _coreCheckboxes.Add(coreCheck);
 
                     var coreLabel = new UILabel
                     {
@@ -376,7 +394,7 @@ namespace MultiOpticalSwitchTestApp
 
                     };
                     panel.Controls.Add(coreLabel);
-                    panel.SetCellPosition(coreLabel, new TableLayoutPanelCellPosition(0, row));
+                    panel.SetCellPosition(coreLabel, new TableLayoutPanelCellPosition(1, row));
 
                     var coreTextBox = new UITextBox
                     {
@@ -386,7 +404,7 @@ namespace MultiOpticalSwitchTestApp
                         Text = c < cores.Count ? cores[c] : string.Empty,
                     };
                     panel.Controls.Add(coreTextBox);
-                    panel.SetCellPosition(coreTextBox, new TableLayoutPanelCellPosition(1, row));
+                    panel.SetCellPosition(coreTextBox, new TableLayoutPanelCellPosition(2, row));
 
                     var btn = new UIButton
                     {
@@ -400,7 +418,7 @@ namespace MultiOpticalSwitchTestApp
                     btn.Click += SwitchChannelButton_Click;
 
                     panel.Controls.Add(btn);
-                    panel.SetCellPosition(btn, new TableLayoutPanelCellPosition(2, row));
+                    panel.SetCellPosition(btn, new TableLayoutPanelCellPosition(3, row));
                 }
             }
 
@@ -652,60 +670,25 @@ namespace MultiOpticalSwitchTestApp
         // 当前轮询会话：波长、表格数据、开关名→id、光源序号→json 里生效的归零值
         private string _pollWaveLen = "1310";
         private List<SwitchPollForm.PollItem> _pollItems = new();
-        private readonly Dictionary<string, int> _pollNameToId = new(StringComparer.OrdinalIgnoreCase);
-        private readonly Dictionary<string, double> _pollJsonZeroValues = new(StringComparer.OrdinalIgnoreCase);
+        // 后台轮询线程会写入、UI 线程会重建，必须用并发安全字典，否则偶发集合损坏异常
+        private readonly ConcurrentDictionary<string, int> _pollNameToId = new(StringComparer.OrdinalIgnoreCase);
+        private readonly ConcurrentDictionary<string, double> _pollJsonZeroValues = new(StringComparer.OrdinalIgnoreCase);
 
         /// <summary>
-        /// 解析轮询序号输入（如 1~15/1/1,2,3/1，2，3）为序号集合。
-        /// 支持范围写法（a~b / a-b，顺序可颠倒）与单个数字，
-        /// 分隔符 / \ , ， ; ； 空格 换行 均可；未填写或格式非法返回 null 由调用方提示。
+        /// 收集被勾选的 Core编号 勾选框对应的「开关名|通道」键集合。
+        /// 全量轮询只执行勾选中的开关通道，键与 zero_diff 里的 switch_name + channel 匹配。
         /// </summary>
-        private static HashSet<int>? ParseCheckListNumbers(string input)
+        private HashSet<string> GetCheckedSwitchChannels()
         {
-            if (string.IsNullOrWhiteSpace(input)) return null;
-
-            const int MaxSpan = 512;
-            var result = new HashSet<int>();
-            string[] tokens = input.Split(
-                new[] { '/', '\\', ',', '，', ';', '；', ' ', '\t', '\r', '\n' },
-                StringSplitOptions.RemoveEmptyEntries);
-
-            foreach (string raw in tokens)
+            var keys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var cb in _coreCheckboxes)
             {
-                string tk = raw.Trim();
-                if (tk.Length == 0) continue;
-
-                int sep = FirstRangeSeparator(tk);
-                if (sep > 0)
-                {
-                    if (!int.TryParse(tk.Substring(0, sep), out int lo) ||
-                        !int.TryParse(tk.Substring(sep + 1), out int hi))
-                        return null;
-                    if (lo <= 0 || hi <= 0) return null;
-                    if (lo > hi) (lo, hi) = (hi, lo);
-                    if (hi - lo + 1 > MaxSpan) return null;
-                    for (int v = lo; v <= hi; v++) result.Add(v);
-                }
-                else
-                {
-                    if (!int.TryParse(tk, out int n) || n <= 0) return null;
-                    result.Add(n);
-                }
+                if (cb is null || !cb.Checked) continue;
+                if (cb.Tag is not (int _, int channel, string switchName)) continue;
+                if (string.IsNullOrEmpty(switchName)) continue;
+                keys.Add($"{switchName}|{channel}");
             }
-
-            return result.Count == 0 ? null : result;
-        }
-
-        /// <summary>返回序号范围分隔符（~ ～ - — –）最早出现的位置，不存在返回 -1。</summary>
-        private static int FirstRangeSeparator(string text)
-        {
-            // 半角波浪号/全角波浪号/连字符/破折号/短破折号
-            const string seps = "\u007E\uFF5E\u002D\u2014\u2013";
-            for (int i = 0; i < text.Length; i++)
-            {
-                if (seps.IndexOf(text[i]) >= 0) return i;
-            }
-            return -1;
+            return keys;
         }
 
         /// <summary>
@@ -722,11 +705,11 @@ namespace MultiOpticalSwitchTestApp
                 return;
             }
 
-            // 轮询序号过滤：依据 checkList.Text 生成序号集合，未命中的 zero_diff 条目不生成表格行
-            HashSet<int>? wantNos = ParseCheckListNumbers(checkList.Text);
-            if (wantNos == null)
+            // 轮询过滤：只执行 Core编号 左侧勾选框选中的开关通道，未勾选任何项时提示
+            HashSet<string> checkedKeys = GetCheckedSwitchChannels();
+            if (checkedKeys.Count == 0)
             {
-                MessageBox.Show("请先填写轮询序号，支持：单个数字(1,2,3)、范围(1~15)、混合(1~8/10,12)，分隔符 / 或 , 均可。", "提示",
+                MessageBox.Show("请先勾选需要轮询的通道（每行 Core编号 左侧的勾选框），再点击全量轮询。", "提示",
                     MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
@@ -781,8 +764,10 @@ namespace MultiOpticalSwitchTestApp
                     var entry = kv.Value;
                     if (entry is null) continue;
 
-                    // 序号不在 checkList 生成的序列里 → 该条目不进表格
-                    if (wantNos != null && (!int.TryParse(kv.Key, out int no) || !wantNos.Contains(no)))
+                    // 该条目的开关名+通道没有对应勾选框 → 不进表格
+                    string swName = CoreText(entry["switch_name"]);
+                    int chNo = NodeInt(entry["channel"]);
+                    if (!checkedKeys.Contains($"{swName}|{chNo}"))
                         continue;
 
                     double zero = NodeDouble(entry["zero_value"]);
@@ -790,8 +775,8 @@ namespace MultiOpticalSwitchTestApp
                         kv.Key,
                         zero,
                         CoreText(entry["core"]),
-                        CoreText(entry["switch_name"]),
-                        NodeInt(entry["channel"])));
+                        swName,
+                        chNo));
                     jsonZero[kv.Key] = zero;
                 }
             }
@@ -804,7 +789,7 @@ namespace MultiOpticalSwitchTestApp
 
             if (items.Count == 0)
             {
-                MessageBox.Show($"按轮询序号「{checkList.Text.Trim()}」过滤后，wavelengths.{waveLen}.zero_diff 没有可显示的数据。", "提示",
+                MessageBox.Show($"已勾选 {checkedKeys.Count} 个通道，但在 wavelengths.{waveLen}.zero_diff 中没有匹配到可轮询的数据。", "提示",
                     MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return;
             }
@@ -865,7 +850,8 @@ namespace MultiOpticalSwitchTestApp
             var cts = new CancellationTokenSource();
             _pollCts = cts;
             form?.SetRunning(true);
-            _ = Task.Run(() => RunPollLoopAsync(cts.Token));
+            // 取消源交给轮询任务自己释放，避免此处提前 Dispose 导致后台线程取 token 抛异常
+            _ = Task.Run(() => RunPollLoopAsync(cts));
         }
 
         /// <summary>主界面 stopAll：取消后台轮询线程，表格保留最后一次的数值。</summary>
@@ -886,19 +872,34 @@ namespace MultiOpticalSwitchTestApp
             var cts = _pollCts;
             _pollCts = null;
             if (cts == null) return;
+            // 只发取消信号，不在这里 Dispose：
+            // 后台线程此刻可能正在 await Task.Delay(..., token)，提前释放会抛异常
             cts.Cancel();
-            cts.Dispose();
             _pollForm?.SetRunning(false);
         }
 
+        /// <summary>轮询中跨开关测试时，把上一个开关复用到的通道。</summary>
+        private const int PollResetChannel = 4;
+
+        /// <summary>复位指令与当前开关切换指令之间的间隔（毫秒），两条指令连发。</summary>
+        private const int PollResetToSwitchDelayMs = 2;
+
+        /// <summary>开关切换指令下发后，等待光路稳定再读功率的时间（毫秒）。</summary>
+        private const int PollSwitchSettleDelayMs = 30;
+
         /// <summary>
         /// 后台轮询：逐条切开关→读功率→刷新表格，一轮完成再下一轮；
+        /// 相邻两条测试属于不同开关时，先复位上一个开关、间隔 2ms 再切当前开关；
+        /// 切换后等 30ms 光路稳定即读功率（设备在连接时已切到高速模式）；
         /// 每轮把表格里的归零值与 zeroDiff.json 比对，不一致则写回配置文件。
         /// </summary>
-        private async Task RunPollLoopAsync(CancellationToken token)
+        private async Task RunPollLoopAsync(CancellationTokenSource cts)
         {
+            var token = cts.Token;
             var form = _pollForm;
             var items = _pollItems;
+            // 上一条测试落在哪个开关（跨轮保留）；null 表示尚未测过任何开关
+            int? lastSwitchId = null;
             try
             {
                 while (!token.IsCancellationRequested)
@@ -920,11 +921,24 @@ namespace MultiOpticalSwitchTestApp
                         // 归零值以表格当前内容为准（用户可手工修改）
                         double zeroValue = form?.GetZeroValue(it.LightNo) ?? it.ZeroValue;
 
+                        // 上一条是别的开关（如 SwitchA）、本轮换开关（如 SwitchB）：
+                        // 先把上一个开关切回复用通道，间隔 2ms 后紧接着切当前开关；
+                        // 同一开关连续测试则只发切换指令
+                        if (lastSwitchId is int prevId && prevId != switchId)
+                        {
+                            byte[] resetFrame = _switchCommand.SwitchLightChannel(prevId, PollResetChannel);
+                            await _switchDevice.WriteBytesAsync(resetFrame);
+                            await Task.Delay(PollResetToSwitchDelayMs, token);
+                        }
+
                         // 与通道按钮同一套指令与串口链路
                         byte[] frame = _switchCommand.SwitchLightChannel(switchId, it.Channel);
                         await _switchDevice.WriteBytesAsync(frame);
-                        await Task.Delay(120, token); // 等待光路切换稳定
+                        lastSwitchId = switchId;
 
+                        // 切换后等光路稳定马上读功率（查询式 READ{CH}:SCALar:POWer:DC?，
+                        // 通道取界面下拉 Global.readChannel，即 uiComboBox2 的选项）
+                        await Task.Delay(PollSwitchSettleDelayMs, token);
                         double power = await device.ReadPowerAsync();
                         double actual = power + zeroValue;
                         form?.UpdateResult(it.LightNo, power.ToString("F4"), actual.ToString("F4"));
@@ -961,6 +975,8 @@ namespace MultiOpticalSwitchTestApp
             finally
             {
                 form?.SetRunning(false);
+                // 轮询任务退出时再释放取消源，此时不会再有 await 使用它
+                cts.Dispose();
             }
         }
 
@@ -1308,7 +1324,7 @@ namespace MultiOpticalSwitchTestApp
                 Console.WriteLine($"[DEBUG] 使用插件工厂创建协议: {protocol.GetType().Name}");
                 Console.WriteLine($"[DEBUG] 找到插件: {plugin?.GetType().Name} 协议: {protocolName} 传输: {transportName}");
                 //_currentDevice = plugin.Create(transport, protocol, new Dictionary<string, string>());
-                String transportParams = ExtractComPort(switchCom.Text) + ":" + baudrate.Text;
+                String transportParams = ExtractComPort(switchCom.Text) + ":" + opticalbaudrate.Text;
                 await transport.OpenAsync(transportParams);
 
                 device = plugin.Create(transport, protocol, new Dictionary<string, string>
@@ -1773,7 +1789,10 @@ namespace MultiOpticalSwitchTestApp
 
             if (rtb_Log.InvokeRequired)
             {
-                rtb_Log.Invoke(new Action(() => OnSerialLog(isSend, logText)));
+                // 后台线程改用异步投递，避免与 UI 线程互相等待；投递失败说明窗体正在关闭，忽略
+                try { rtb_Log.BeginInvoke(new Action(() => OnSerialLog(isSend, logText))); }
+                catch (ObjectDisposedException) { }
+                catch (InvalidOperationException) { }
                 return;
             }
 
@@ -1883,7 +1902,10 @@ namespace MultiOpticalSwitchTestApp
                 try
                 {
                     // 优先用 ProductVersion（对应 .csproj 的 <Version>，3 段式如 1.0.9）
+                    // 单文件发布时 Assembly.Location 为空，改用进程可执行文件路径
                     var loc = Assembly.GetExecutingAssembly().Location;
+                    if (string.IsNullOrEmpty(loc) || !File.Exists(loc))
+                        loc = Environment.ProcessPath;
                     if (!string.IsNullOrEmpty(loc) && File.Exists(loc))
                     {
                         var ver = System.Diagnostics.FileVersionInfo.GetVersionInfo(loc).ProductVersion;
@@ -1949,6 +1971,11 @@ namespace MultiOpticalSwitchTestApp
 
         }
 
+        private void checkAll_Click_1(object sender, EventArgs e)
+        {
+
+        }
+
         /// <summary>
         /// 检查更新并按需弹窗（直连 SMB 共享目录模式F
         /// silentWhenNoUpdate=true：无新版本时不弹"已是最新"（用于启动自动检查）
@@ -1964,7 +1991,10 @@ namespace MultiOpticalSwitchTestApp
             {
                 try
                 {
+                    // 单文件发布时 Assembly.Location 为空，回退到进程可执行文件路径
                     var loc = System.Reflection.Assembly.GetExecutingAssembly().Location;
+                    if (string.IsNullOrEmpty(loc) || !System.IO.File.Exists(loc))
+                        loc = Environment.ProcessPath;
                     if (!string.IsNullOrEmpty(loc) && System.IO.File.Exists(loc))
                         return System.IO.File.GetLastWriteTime(loc).ToString("yyyy-MM-dd HH:mm:ss");
                 }

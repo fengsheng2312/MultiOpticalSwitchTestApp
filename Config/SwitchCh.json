@@ -55,7 +55,7 @@
           ]
         },
         {
-          "id": 4,
+          "id": 9,
           "name": "SwitchD",
           "channels": [
             1,
@@ -71,7 +71,7 @@
           ]
         },
         {
-          "id": 5,
+          "id": 10,
           "name": "SwitchE",
           "channels": [
             1,
