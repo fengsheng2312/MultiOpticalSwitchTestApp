@@ -10,9 +10,9 @@
     <RuntimeIdentifiers>win-x64</RuntimeIdentifiers>
 
 	  <!-- 版本号统一在这里维护，发布脚本会自动修改 -->
-	  <Version>1.0.2</Version>
-	  <FileVersion>1.0.2.0</FileVersion>
-	  <AssemblyVersion>1.0.2.0</AssemblyVersion>
+	  <Version>1.0.6</Version>
+	  <FileVersion>1.0.6.0</FileVersion>
+	  <AssemblyVersion>1.0.6.0</AssemblyVersion>
 	  <!-- 构建时间，编译时自动生成（不需要手动改） -->
 
 	  

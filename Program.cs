@@ -56,10 +56,7 @@ namespace MultiOpticalSwitchTestApp
             FreeConsole();
         }
 
-        /// <summary>把未处理异常写入
-        /// 
-        /// 
-        /// 与崩溃日志文件。</summary>
+        /// <summary>把未处理异常写入控制台与崩溃日志文件。</summary>
         private static void ReportUnhandled(string source, Exception? ex)
         {
             if (ex is null) return;
